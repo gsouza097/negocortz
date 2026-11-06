@@ -4,9 +4,12 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { appointments, barbers } from "@/db/schema";
+import { appointments, barbers, services } from "@/db/schema";
 import { requireMember } from "@/lib/tenant";
-import { zonedToMs } from "@/lib/time";
+import { agendaRules, loadAgenda } from "@/lib/agenda";
+import { bookableStarts } from "@/lib/slots";
+import { whatsAppSchema } from "@/lib/phone";
+import { isISODate, localDateISO, zonedToMs } from "@/lib/time";
 import { firstError, formObject, pgErrorCode, type FormState } from "@/lib/forms";
 
 /** Dono gerencia qualquer barbeiro da barbearia; barbeiro só a própria agenda. */
@@ -35,7 +38,13 @@ export async function cancelAppointment(fd: FormData) {
     .update(appointments)
     .set({ status: "cancelled", cancelledAt: new Date() })
     .where(and(eq(appointments.id, id), eq(appointments.orgId, ctx.org.id)));
+  refreshAgenda(slug);
+}
+
+function refreshAgenda(slug: string) {
   revalidatePath(`/painel/${slug}`);
+  revalidatePath("/");
+  revalidatePath("/[slug]/[barber]", "page");
 }
 
 const time = z.string().regex(/^\d{2}:\d{2}$/, "Horário inválido.");
@@ -70,6 +79,69 @@ export async function addBlock(_: FormState, fd: FormData): Promise<FormState> {
     if (pgErrorCode(e) === "23P01") return { error: "Já existe reserva nesse intervalo. Cancele-a antes de bloquear." };
     throw e;
   }
-  revalidatePath(`/painel/${slug}`);
+  refreshAgenda(slug);
   return { ok: "Horário bloqueado." };
+}
+
+const manualBookingSchema = z.object({
+  slug: z.string(),
+  barberId: z.uuid("Escolha o barbeiro."),
+  serviceId: z.uuid("Escolha o serviço."),
+  date: z.string().refine(isISODate, "Data inválida."),
+  start: z.coerce.number().int().positive("Escolha um horário disponível."),
+  guestName: z.string().trim().min(2, "Informe o nome do cliente.").max(80),
+  guestPhone: whatsAppSchema,
+});
+
+export async function addManualBooking(_: FormState, fd: FormData): Promise<FormState> {
+  const parsed = manualBookingSchema.safeParse(formObject(fd));
+  if (!parsed.success) return { error: firstError(parsed.error) };
+  const { slug, barberId, serviceId, date, start, guestName, guestPhone } = parsed.data;
+  const { org } = await requireMember(slug, ["owner"]);
+
+  const [[barber], [service]] = await Promise.all([
+    db.select({ id: barbers.id }).from(barbers)
+      .where(and(eq(barbers.orgId, org.id), eq(barbers.id, barberId), eq(barbers.active, true))),
+    db.select().from(services)
+      .where(and(eq(services.orgId, org.id), eq(services.id, serviceId), eq(services.active, true))),
+  ]);
+  if (!barber || !service) return { error: "Barbeiro ou serviço indisponível." };
+
+  const rules = agendaRules(org);
+  if (start < rules.earliest || start > rules.latest || localDateISO(start, org.timezone) !== date) {
+    refreshAgenda(slug);
+    return { error: "Escolha um horário disponível no dia selecionado." };
+  }
+  const [day] = await loadAgenda(org, barberId, date, 1);
+  if (!bookableStarts(day, service.durationMin, rules).includes(start)) {
+    refreshAgenda(slug);
+    return { error: "Esse horário não está mais disponível. Escolha outro." };
+  }
+
+  try {
+    await db.insert(appointments).values({
+      orgId: org.id,
+      barberId,
+      serviceId,
+      serviceName: service.name,
+      priceCents: service.priceCents,
+      guestName,
+      guestPhone,
+      startsAt: new Date(start),
+      endsAt: new Date(start + service.durationMin * 60_000),
+    });
+  } catch (error) {
+    if (pgErrorCode(error) === "23P01") {
+      refreshAgenda(slug);
+      return { error: "Esse horário acabou de ser ocupado. Escolha outro." };
+    }
+    if (pgErrorCode(error) === "23503") {
+      refreshAgenda(slug);
+      return { error: "Barbeiro ou serviço indisponível." };
+    }
+    throw error;
+  }
+
+  refreshAgenda(slug);
+  return { ok: "Agendamento registrado." };
 }

@@ -5,7 +5,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
-import { sessions, users } from "@/db/schema";
+import { memberships, organizations, sessions, users } from "@/db/schema";
+import { SHOP_SLUG } from "@/lib/brand";
+import { normalizeWhatsApp } from "@/lib/phone";
 
 const COOKIE = "navalha_session";
 const TTL_DAYS = 30;
@@ -47,8 +49,21 @@ export const getUser = cache(async (): Promise<SessionUser | null> => {
   return row ?? null;
 });
 
+export function phoneSetupPath(next: string) {
+  return `/completar-cadastro?next=${encodeURIComponent(next)}`;
+}
+
+export const needsCustomerPhone = cache(async (userId: string, phone: string | null) => {
+  if (normalizeWhatsApp(phone)) return false;
+  const [teamMember] = await db.select({ id: memberships.userId }).from(memberships)
+    .innerJoin(organizations, eq(organizations.id, memberships.orgId))
+    .where(and(eq(memberships.userId, userId), eq(organizations.slug, SHOP_SLUG))).limit(1);
+  return !teamMember;
+});
+
 export async function requireUser(next?: string) {
   const user = await getUser();
   if (!user) redirect(next ? `/entrar?next=${encodeURIComponent(next)}` : "/entrar");
+  if (await needsCustomerPhone(user.id, user.phone)) redirect(phoneSetupPath(next ?? "/inicio"));
   return user;
 }

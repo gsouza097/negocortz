@@ -18,7 +18,7 @@ export function firstError(err: z.ZodError) {
 
 /** Redirect interno seguro: só caminhos relativos do próprio app. */
 export function safeNext(next: string | null | undefined, fallback = "/") {
-  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : fallback;
+  return next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") && !Array.from(next).some((char) => char.charCodeAt(0) < 32 || char === "\x7f") ? next : fallback;
 }
 
 /** Normaliza @handle, URL do Instagram ou handle puro para só o handle. */

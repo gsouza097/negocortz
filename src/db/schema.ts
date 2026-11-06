@@ -209,6 +209,8 @@ export const appointments = pgTable(
     clientId: uuid("client_id").references(() => users.id, {
       onDelete: "set null",
     }),
+    guestName: text("guest_name"),
+    guestPhone: text("guest_phone"),
     serviceId: uuid("service_id").references(() => services.id, {
       onDelete: "set null",
     }),

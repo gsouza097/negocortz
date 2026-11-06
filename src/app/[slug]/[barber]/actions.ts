@@ -6,7 +6,8 @@ import { and, eq, gt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { appointments, barbers, services } from "@/db/schema";
-import { getUser } from "@/lib/auth/session";
+import { normalizeWhatsApp } from "@/lib/phone";
+import { getUser, phoneSetupPath } from "@/lib/auth/session";
 import { agendaRules, loadAgenda } from "@/lib/agenda";
 import { bookableStarts } from "@/lib/slots";
 import { localDateISO } from "@/lib/time";
@@ -47,6 +48,7 @@ export async function bookAppointment(_: FormState, fd: FormData): Promise<FormS
   ]);
   if (!barber || !service) return { error: "Barbeiro ou serviço indisponível." };
   const profilePath = `/${slug}/${barber.handle}`;
+  if (!normalizeWhatsApp(user.phone)) redirect(phoneSetupPath(`${profilePath}#agenda`));
 
   // revalida no servidor com a mesma regra que desenhou a agenda
   const date = localDateISO(start, org.timezone);

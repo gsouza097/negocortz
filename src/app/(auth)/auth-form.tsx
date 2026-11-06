@@ -22,8 +22,8 @@ export function AuthForm({ mode, next }: { mode: "entrar" | "cadastro"; next?: s
         <Input name="email" type="email" autoComplete="email" required defaultValue={f.email} />
       </Field>
       {mode === "cadastro" && (
-        <Field label="WhatsApp" hint="Opcional. O barbeiro vê para confirmar ou avisar atrasos.">
-          <Input name="phone" type="tel" autoComplete="tel" placeholder="(11) 90000-0000" defaultValue={f.phone} />
+        <Field label="WhatsApp" hint="Informe um celular com DDD para contato sobre suas reservas.">
+          <Input name="phone" type="tel" autoComplete="tel" required maxLength={30} placeholder="(11) 91234-5678" defaultValue={f.phone} />
         </Field>
       )}
       <Field label="Senha">

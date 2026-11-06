@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { barbers, invites, memberships, organizations } from "@/db/schema";
-import { getUser } from "@/lib/auth/session";
+import { getUser, requireUser } from "@/lib/auth/session";
 import { createBarberProfile } from "@/lib/barbers";
 import { SHOP_SLUG } from "@/lib/brand";
 import { SiteHeader } from "@/components/site-header";
@@ -25,8 +25,7 @@ async function findInvite(token: string) {
 async function accept(fd: FormData) {
   "use server";
   const token = String(fd.get("token"));
-  const user = await getUser();
-  if (!user) redirect(`/entrar?next=/convite/${token}`);
+  const user = await requireUser(`/convite/${token}`);
   const found = await findInvite(token);
   if (!found) redirect(`/convite/${token}`);
   const { invite, org } = found;

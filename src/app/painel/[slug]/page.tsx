@@ -2,14 +2,17 @@ import { requestTime } from "@/lib/clock";
 import Link from "next/link";
 import { and, asc, eq, gte, inArray, lt } from "drizzle-orm";
 import { db } from "@/db";
-import { appointments, barbers, users } from "@/db/schema";
+import { appointments, barbers, services, users } from "@/db/schema";
+import { agendaRules, loadAgenda } from "@/lib/agenda";
+import { normalizeWhatsApp } from "@/lib/phone";
 import { requireMember } from "@/lib/tenant";
 import { addDaysISO, fmtDateLong, fmtPrice, fmtTime, isISODate, localDateISO, zonedToMs } from "@/lib/time";
 import { Avatar } from "@/components/avatar";
-import { ButtonLink } from "@/components/ui";
+import { ButtonLink, Input } from "@/components/ui";
 import { buttonClass, cx } from "@/components/styles";
 import { cancelAppointment } from "./actions";
 import { BlockForm } from "./block-form";
+import { ManualBookingForm } from "./manual-booking-form";
 
 export default async function AgendaPage({ params, searchParams }: PageProps<"/painel/[slug]">) {
   const { slug } = await params;
@@ -27,7 +30,10 @@ export default async function AgendaPage({ params, searchParams }: PageProps<"/p
         ? [me]
         : [];
 
-  const rows = team.length
+  const rules = agendaRules(org, now);
+  const canBookManually = role === "owner" && team.length > 0;
+  const [rows, serviceList, barberAgendas] = await Promise.all([
+    team.length
     ? await db
         .select({
           id: appointments.id,
@@ -41,6 +47,8 @@ export default async function AgendaPage({ params, searchParams }: PageProps<"/p
           note: appointments.note,
           clientName: users.name,
           clientPhone: users.phone,
+          guestName: appointments.guestName,
+          guestPhone: appointments.guestPhone,
         })
         .from(appointments)
         .leftJoin(users, eq(users.id, appointments.clientId))
@@ -53,7 +61,19 @@ export default async function AgendaPage({ params, searchParams }: PageProps<"/p
           ),
         )
         .orderBy(asc(appointments.startsAt))
-    : [];
+    : [],
+    canBookManually
+      ? db.select({ id: services.id, name: services.name, durationMin: services.durationMin, priceCents: services.priceCents })
+          .from(services).where(and(eq(services.orgId, org.id), eq(services.active, true)))
+          .orderBy(asc(services.sort), asc(services.name))
+      : [],
+    canBookManually
+      ? Promise.all(team.map(async (barber) => {
+          const [agenda] = await loadAgenda(org, barber.id, day, 1);
+          return { id: barber.id, name: barber.displayName, agenda };
+        }))
+      : [],
+  ]);
 
   const confirmed = rows.filter((r) => r.kind === "booking" && r.status === "confirmed");
   const revenue = confirmed.reduce((a, r) => a + (r.priceCents ?? 0), 0);
@@ -94,6 +114,25 @@ export default async function AgendaPage({ params, searchParams }: PageProps<"/p
         </div>
       </dl>
 
+      {canBookManually && (
+        <section className="mt-6 max-w-2xl rounded-3xl border border-line bg-white p-5">
+          <h2 className="font-display text-3xl">Agendar para cliente</h2>
+          <p className="mb-4 text-sm text-ink-2">Registre o atendimento de quem entrou em contato com a barbearia, mesmo sem conta.</p>
+          <form method="get" className="mb-4 flex flex-wrap items-end gap-2">
+            <label className="grid gap-1 text-sm font-semibold">
+              Dia do atendimento
+              <Input type="date" name="dia" defaultValue={day} required />
+            </label>
+            <button className={buttonClass({ variant: "outline", size: "sm" })}>Ver horários do dia</button>
+          </form>
+          {serviceList.length ? (
+            <ManualBookingForm key={day} slug={slug} date={day} timezone={tz} barbers={barberAgendas} services={serviceList} rules={rules} />
+          ) : (
+            <ButtonLink href={`/painel/${slug}/servicos`} size="sm">Cadastrar serviço</ButtonLink>
+          )}
+        </section>
+      )}
+
       {team.length === 0 ? (
         <div className="mt-8 rounded-3xl border border-dashed border-line p-8">
           <p className="font-semibold">Nenhum barbeiro ativo ainda.</p>
@@ -124,6 +163,8 @@ export default async function AgendaPage({ params, searchParams }: PageProps<"/p
                     {list.map((r) => {
                       const cancelled = r.status === "cancelled";
                       const past = r.endsAt.getTime() < now;
+                      const contact = r.guestPhone ?? r.clientPhone;
+                      const whatsapp = normalizeWhatsApp(contact);
                       return (
                         <li key={r.id} className={cx("flex gap-4 p-4", (cancelled || past) && "opacity-55")}>
                           <div className="w-14 shrink-0 font-mono text-sm">
@@ -138,21 +179,22 @@ export default async function AgendaPage({ params, searchParams }: PageProps<"/p
                               </p>
                             ) : (
                               <>
-                                <p className={cx("font-semibold", cancelled && "line-through")}>{r.clientName ?? "Cliente removido"}</p>
+                                <p className={cx("font-semibold", cancelled && "line-through")}>{r.guestName ?? r.clientName ?? "Cliente removido"}</p>
                                 <p className="text-sm text-ink-2">
                                   {r.serviceName}
                                   {r.priceCents != null && ` · ${fmtPrice(r.priceCents)}`}
                                 </p>
-                                {r.clientPhone && (
+                                {r.guestName && <p className="text-xs text-ink-2">Agendamento manual</p>}
+                                {whatsapp ? (
                                   <a
                                     className="text-sm text-moss underline underline-offset-4"
-                                    href={`https://wa.me/55${r.clientPhone.replace(/\D/g, "").replace(/^55/, "")}`}
+                                    href={`https://wa.me/${whatsapp.slice(1)}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                   >
-                                    {r.clientPhone}
+                                    {contact}
                                   </a>
-                                )}
+                                ) : contact ? <p className="text-sm text-ink-2">{contact}</p> : null}
                                 {r.note && <p className="mt-1 rounded-lg bg-paper px-2 py-1 text-sm">“{r.note}”</p>}
                               </>
                             )}
