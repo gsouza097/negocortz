@@ -7,7 +7,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <aside className="relative hidden overflow-hidden bg-night text-paper lg:block">
         <div className="pole-stripes absolute inset-y-0 left-0 w-3" />
         <div className="flex h-full flex-col justify-between p-12">
-          <Link href="/" aria-label="Navalha, início">
+          <Link href="/" aria-label="Nego Cortez, início">
             <Logo className="text-paper" />
           </Link>
           <p className="font-display text-[clamp(56px,6vw,96px)] leading-[0.85]">
@@ -18,12 +18,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             <span className="text-pole">na hora certa.</span>
           </p>
           <p className="max-w-sm text-sm text-paper/60">
-            Veja a agenda inteira do seu barbeiro, escolha um horário livre e pronto. Sem áudio no WhatsApp.
+            Reserve seu próximo horário na Barbearia Nego Cortez.
           </p>
         </div>
       </aside>
       <main className="flex flex-col px-4 py-8 sm:px-10">
-        <Link href="/" className="lg:hidden" aria-label="Navalha, início">
+        <Link href="/" className="lg:hidden" aria-label="Nego Cortez, início">
           <Logo />
         </Link>
         <div className="m-auto w-full max-w-sm py-10">{children}</div>

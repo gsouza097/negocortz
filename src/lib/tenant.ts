@@ -5,13 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { barbers, memberships, organizations } from "@/db/schema";
 import { requireUser } from "./auth/session";
-
-// Rotas de primeiro nível que não podem virar slug de barbearia.
-export const RESERVED_SLUGS = new Set([
-  "api", "entrar", "cadastro", "sair", "inicio", "painel", "convite", "minhas-reservas",
-  "nova-barbearia", "conta", "sobre", "precos", "ajuda", "termos", "privacidade",
-  "admin", "app", "uploads", "_next", "static", "favicon.ico", "robots.txt", "sitemap.xml",
-]);
+import { SHOP_SLUG } from "./brand";
 
 export function slugify(input: string) {
   return input
@@ -25,6 +19,7 @@ export function slugify(input: string) {
 }
 
 export const getOrgBySlug = cache(async (slug: string) => {
+  if (slug !== SHOP_SLUG) return null;
   const [org] = await db.select().from(organizations).where(eq(organizations.slug, slug)).limit(1);
   return org ?? null;
 });

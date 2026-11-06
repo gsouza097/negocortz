@@ -60,6 +60,8 @@ export default async function TeamPage({ params }: PageProps<"/painel/[slug]/equ
                 · {email}
               </p>
             </div>
+            <Link href={`/painel/${slug}/perfil?barbeiro=${b.id}`} className={buttonClass({ variant: "outline", size: "sm" })}>Perfil e fotos</Link>
+            <Link href={`/painel/${slug}/horarios?barbeiro=${b.id}`} className={buttonClass({ variant: "outline", size: "sm" })}>Expediente</Link>
             <form action={toggleBarber}>
               <input type="hidden" name="slug" value={slug} />
               <input type="hidden" name="id" value={b.id} />

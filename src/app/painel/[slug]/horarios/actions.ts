@@ -1,46 +1,56 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { workingHours } from "@/db/schema";
-import { requireMember } from "@/lib/tenant";
+import { requireManagedBarber } from "@/lib/managed-barber";
 import { WEEKDAYS } from "@/lib/time";
 import type { FormState } from "@/lib/forms";
 
-const toMin = (v: FormDataEntryValue | null) => {
-  const s = String(v ?? "");
-  if (!/^\d{2}:\d{2}$/.test(s)) return null;
-  return Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
-};
+function toMinutes(value: FormDataEntryValue | null) {
+  if (typeof value !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) return null;
+  const [hour, minute] = value.split(":").map(Number);
+  return hour * 60 + minute;
+}
 
 export async function saveHours(_: FormState, fd: FormData): Promise<FormState> {
   const slug = String(fd.get("slug"));
-  const { barber } = await requireMember(slug);
-  if (!barber) return { error: "Você não tem perfil de barbeiro aqui." };
+  const { barber } = await requireManagedBarber(slug, String(fd.get("barberId") ?? "") || undefined);
+  const rows: (typeof workingHours.$inferInsert)[] = [];
+  for (let weekday = 0; weekday < 7; weekday++) {
+    if (!fd.get(`d${weekday}_on`)) continue;
+    const start = toMinutes(fd.get(`d${weekday}_start`));
+    const end = toMinutes(fd.get(`d${weekday}_end`));
+    const day = WEEKDAYS[weekday];
+    if (start === null || end === null || start >= end) return { error: `${day}: informe o início e o fim do expediente.` };
 
-  const rows: { barberId: string; weekday: number; startMin: number; endMin: number }[] = [];
-  for (let wd = 0; wd < 7; wd++) {
-    if (!fd.get(`d${wd}_on`)) continue;
-    const ranges = [
-      [toMin(fd.get(`d${wd}_s1`)), toMin(fd.get(`d${wd}_e1`))],
-      [toMin(fd.get(`d${wd}_s2`)), toMin(fd.get(`d${wd}_e2`))],
-    ].filter(([s, e]) => s !== null || e !== null);
-    if (!ranges.length) return { error: `${WEEKDAYS[wd]}: informe o horário ou desmarque o dia.` };
-    for (const [s, e] of ranges) {
-      if (s === null || e === null || s >= e) return { error: `${WEEKDAYS[wd]}: horário inválido.` };
-      rows.push({ barberId: barber.id, weekday: wd, startMin: s, endMin: e });
+    const lunchStartValue = fd.get(`d${weekday}_lunchStart`);
+    const lunchEndValue = fd.get(`d${weekday}_lunchEnd`);
+    if (!lunchStartValue && !lunchEndValue) {
+      rows.push({ barberId: barber.id, weekday, startMin: start, endMin: end });
+      continue;
     }
-    if (ranges.length === 2 && ranges[1][0]! < ranges[0][1]!) {
-      return { error: `${WEEKDAYS[wd]}: o segundo turno precisa começar depois do primeiro.` };
+
+    const lunchStart = toMinutes(lunchStartValue);
+    const lunchEnd = toMinutes(lunchEndValue);
+    if (lunchStart === null || lunchEnd === null || start >= lunchStart || lunchStart >= lunchEnd || lunchEnd >= end) {
+      return { error: `${day}: informe os dois horários da pausa, em ordem e dentro do expediente.` };
     }
+    rows.push(
+      { barberId: barber.id, weekday, startMin: start, endMin: lunchStart },
+      { barberId: barber.id, weekday, startMin: lunchEnd, endMin: end },
+    );
   }
 
   await db.transaction(async (tx) => {
+    // Serializa edições do mesmo barbeiro, inclusive quando a agenda está vazia.
+    await tx.execute(sql`select id from barbers where id = ${barber.id} for update`);
     await tx.delete(workingHours).where(eq(workingHours.barberId, barber.id));
     if (rows.length) await tx.insert(workingHours).values(rows);
   });
   revalidatePath(`/painel/${slug}/horarios`);
+  revalidatePath("/");
   revalidatePath(`/${slug}`, "layout");
   return { ok: "Horários salvos. A agenda pública já foi atualizada." };
 }

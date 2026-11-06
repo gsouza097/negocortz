@@ -33,7 +33,7 @@ export default async function PanelLayout({ children, params }: LayoutProps<"/pa
         <div className="flex h-full flex-col gap-4 p-4 lg:p-5">
           <div className="flex items-center justify-between gap-3">
             <Link href="/painel" aria-label="Painel">
-              <Logo className="text-paper [--logo-handle:var(--color-night)]" />
+              <Logo className="text-paper" />
             </Link>
             <Link href={`/${slug}`} className="text-xs text-paper/60 underline underline-offset-4 hover:text-paper lg:hidden">
               Ver página

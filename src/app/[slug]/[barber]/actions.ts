@@ -93,6 +93,10 @@ export async function bookAppointment(_: FormState, fd: FormData): Promise<FormS
       revalidatePath(profilePath);
       return { error: "Alguém acabou de reservar esse horário. Escolha outro." };
     }
+    if (pgErrorCode(e) === "23503") {
+      revalidatePath(profilePath);
+      return { error: "Barbeiro ou serviço indisponível." };
+    }
     throw e;
   }
 

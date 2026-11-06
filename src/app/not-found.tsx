@@ -6,7 +6,7 @@ export default function NotFound() {
   return (
     <main className="grid min-h-dvh place-items-center bg-night px-4 text-paper">
       <div className="text-center">
-        <Link href="/" aria-label="Navalha, início">
+        <Link href="/" aria-label="Nego Cortez, início">
           <Logo className="text-paper [--logo-handle:var(--color-night)]" />
         </Link>
         <p className="mt-10 font-display text-[clamp(96px,20vw,220px)] leading-[0.8] text-pole">404</p>

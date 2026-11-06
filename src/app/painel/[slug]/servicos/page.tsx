@@ -3,7 +3,8 @@ import { db } from "@/db";
 import { services } from "@/db/schema";
 import { requireMember } from "@/lib/tenant";
 import { fmtDuration, fmtPrice } from "@/lib/time";
-import { cx } from "@/components/styles";
+import { deleteService } from "./actions";
+import { buttonClass, cx } from "@/components/styles";
 import { ServiceForm } from "./service-form";
 
 export default async function ServicesPage({ params }: PageProps<"/painel/[slug]/servicos">) {
@@ -39,6 +40,15 @@ export default async function ServicesPage({ params }: PageProps<"/painel/[slug]
               </summary>
               <div className="border-t border-line p-5">
                 <ServiceForm slug={slug} service={s} />
+                <details className="mt-5">
+                  <summary className="cursor-pointer text-sm font-semibold text-pole-ink">Excluir serviço</summary>
+                  <form action={deleteService} className="mt-3 space-y-3">
+                    <p className="text-sm text-ink-2">O serviço sairá do catálogo. As reservas existentes serão preservadas.</p>
+                    <input type="hidden" name="slug" value={slug} />
+                    <input type="hidden" name="id" value={s.id} />
+                    <button className={buttonClass({ variant: "danger", size: "sm" })}>Confirmar exclusão</button>
+                  </form>
+                </details>
               </div>
             </details>
           </li>

@@ -1,3 +1,4 @@
+import { SHOP_NAME, SHOP_SLUG } from "../lib/brand";
 import type { DB } from "./index";
 import * as s from "./schema";
 import { hashPassword } from "../lib/auth/password";
@@ -27,14 +28,8 @@ export async function seed(db: DB) {
   const [org] = await db
     .insert(s.organizations)
     .values({
-      slug: "casa-brava",
-      name: "Casa Brava Barbearia",
-      description:
-        "Barbearia de bairro desde 2016. Corte clássico, degradê na navalha e barba com toalha quente. Café passado na hora, sempre.",
-      address: "Rua Augusta, 1200",
-      city: "São Paulo, SP",
-      phone: "(11) 3000-0000",
-      instagram: "demo.casabrava",
+      slug: SHOP_SLUG,
+      name: SHOP_NAME,
       timezone: TZ,
     })
     .returning();
@@ -65,8 +60,8 @@ export async function seed(db: DB) {
         userId: rafa.id,
         handle: "rafa",
         displayName: "Rafa Nogueira",
-        bio: "Fundador da Casa Brava. 10 anos de tesoura, especialista em corte clássico e barba desenhada. Atendo com hora marcada.",
-        instagram: "demo.rafa.casabrava",
+        bio: "Especialista em corte clássico e barba desenhada. Atendo com hora marcada.",
+        instagram: "demo.rafa",
         specialties: ["Corte clássico", "Barba", "Navalha"],
         since: 2014,
       },

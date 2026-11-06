@@ -43,13 +43,13 @@ Aba **Deployments**, menu `⋯` do último deploy, **Redeploy**. Agora o build:
 1. aplica as migrações em `drizzle/` no Neon;
 2. compila o app.
 
-Abra a URL do projeto: a landing aparece em `/`. Crie uma conta, vá em **Criar minha barbearia** e configure serviços, equipe e horários.
+Abra a URL do projeto: a landing aparece em `/`. Provisione a conta do dono conforme o [README](README.md#produção). Depois, o dono pode configurar serviços, equipe e horários no painel.
 
 ## 5. Ajustes recomendados
 
 - **Região das Functions:** em *Settings → Functions*, escolha a mesma região do banco. Cada página consulta o Postgres; com o banco em outro continente, cada consulta paga a latência da viagem.
 - **Domínio próprio:** *Settings → Domains*. As barbearias ficam em `seudominio.com/{slug}`.
-- **Fuso horário:** toda barbearia nova usa `America/Sao_Paulo`. Para outro fuso, altere a coluna `timezone` em `organizations` (ainda não há campo na tela).
+- **Fuso horário:** a barbearia usa `America/Sao_Paulo`. Para outro fuso, altere a coluna `timezone` em `organizations` (ainda não há campo na tela).
 
 ## Variáveis de ambiente
 

@@ -16,8 +16,9 @@ const schema = z.object({
   price: z
     .string()
     .trim()
-    .transform((v) => Math.round(Number(v.replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3}\b)/g, "").replace(",", ".")) * 100))
-    .refine((c) => Number.isFinite(c) && c >= 0, "Preço inválido."),
+    .regex(/^\d+(?:[.,]\d{1,2})?$/, "Informe um preço válido, como 45,00.")
+    .transform((v) => Math.round(Number(v.replace(",", ".")) * 100))
+    .refine((c) => Number.isInteger(c) && c >= 0 && c <= 2_147_483_647, "Preço inválido."),
   active: z.string().optional(),
 });
 
@@ -38,7 +39,19 @@ export async function saveService(_: FormState, fd: FormData): Promise<FormState
       .where(eq(services.orgId, org.id));
     await db.insert(services).values({ ...values, orgId: org.id, sort: next });
   }
+  revalidatePath("/");
   revalidatePath(`/painel/${slug}/servicos`);
   revalidatePath(`/${slug}`, "layout");
   return { ok: id ? "Serviço atualizado." : "Serviço criado." };
+}
+
+export async function deleteService(fd: FormData) {
+  const slug = String(fd.get("slug"));
+  const { org } = await requireMember(slug, ["owner"]);
+  const id = z.uuid().safeParse(fd.get("id"));
+  if (!id.success) return;
+  await db.delete(services).where(and(eq(services.id, id.data), eq(services.orgId, org.id)));
+  revalidatePath("/");
+  revalidatePath(`/painel/${slug}/servicos`);
+  revalidatePath(`/${slug}`, "layout");
 }

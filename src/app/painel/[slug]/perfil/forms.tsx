@@ -5,13 +5,14 @@ import { Avatar } from "@/components/avatar";
 import { ImageInput } from "@/components/image-input";
 import { Button, Field, FormMessage, Input, SubmitButton, Textarea } from "@/components/ui";
 import type { Barber } from "@/db/schema";
-import { addPhoto, saveProfile } from "./actions";
+import { addPhoto, renamePhoto, saveProfile } from "./actions";
 
 export function ProfileForm({ slug, barber, origin }: { slug: string; barber: Barber; origin: string }) {
   const [state, action] = useActionState(saveProfile, undefined);
   return (
     <form action={action} className="space-y-5">
       <input type="hidden" name="slug" value={slug} />
+      <input type="hidden" name="barberId" value={barber.id} />
       <ImageInput name="avatar" max={600}>
         {({ preview, busy, pick }) => (
           <div className="flex items-center gap-4">
@@ -55,7 +56,23 @@ export function ProfileForm({ slug, barber, origin }: { slug: string; barber: Ba
   );
 }
 
-export function PhotoForm({ slug }: { slug: string }) {
+export function PhotoNameForm({ slug, barberId, id, caption }: { slug: string; barberId: string; id: string; caption: string | null }) {
+  const [state, action] = useActionState(renamePhoto, undefined);
+  return (
+    <form action={action} className="space-y-2 p-3">
+      <input type="hidden" name="slug" value={slug} />
+      <input type="hidden" name="barberId" value={barberId} />
+      <input type="hidden" name="id" value={id} />
+      <Field label="Nome do corte">
+        <Input name="caption" defaultValue={caption ?? ""} required maxLength={120} />
+      </Field>
+      <SubmitButton size="sm" variant="outline">Salvar nome</SubmitButton>
+      <FormMessage state={state} />
+    </form>
+  );
+}
+
+export function PhotoForm({ slug, barberId }: { slug: string; barberId: string }) {
   // nonce remonta o seletor após publicar, limpando a prévia
   const [nonce, setNonce] = useState(0);
   const [state, action] = useActionState(async (prev: Awaited<ReturnType<typeof addPhoto>>, fd: FormData) => {
@@ -66,6 +83,7 @@ export function PhotoForm({ slug }: { slug: string }) {
   return (
     <form action={action} className="space-y-3">
       <input type="hidden" name="slug" value={slug} />
+      <input type="hidden" name="barberId" value={barberId} />
       <ImageInput key={nonce} name="photo">
         {({ preview, busy, pick }) => (
           <div className="flex flex-wrap items-end gap-3">
@@ -84,7 +102,9 @@ export function PhotoForm({ slug }: { slug: string }) {
               )}
             </button>
             <div className="min-w-48 flex-1 space-y-3">
-              <Input name="caption" placeholder="Legenda (opcional)" maxLength={120} />
+              <Field label="Nome do corte">
+                <Input name="caption" placeholder="Ex.: Taper Fade" required maxLength={120} />
+              </Field>
               <SubmitButton size="sm" disabled={!preview} pending="Enviando…">
                 Publicar no portfólio
               </SubmitButton>

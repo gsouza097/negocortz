@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env.local scripts/migrate.ts",
+    "db:provision-owner": "tsx --env-file-if-exists=.env.local scripts/provision-owner.ts",
     "db:seed": "tsx --env-file-if-exists=.env.local scripts/seed.ts",
     "db:reset": "rm -rf .pglite && tsx --env-file-if-exists=.env.local scripts/migrate.ts"
   },

@@ -25,10 +25,9 @@ export async function createBarberProfile(tx: Tx | DB, orgId: string, user: { id
     .values({ orgId, userId: user.id, handle, displayName: user.name })
     .returning();
   await tx.insert(workingHours).values(
-    [2, 3, 4, 5, 6].flatMap((weekday) => [
-      { barberId: barber.id, weekday, startMin: 9 * 60, endMin: 12 * 60 },
-      { barberId: barber.id, weekday, startMin: 13 * 60, endMin: 19 * 60 },
-    ]),
+    [2, 3, 4, 5, 6].map((weekday) => (
+      { barberId: barber.id, weekday, startMin: 9 * 60, endMin: 19 * 60 }
+    )),
   );
   return barber;
 }

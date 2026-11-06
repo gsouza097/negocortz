@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { barbers, invites, memberships, organizations } from "@/db/schema";
 import { getUser } from "@/lib/auth/session";
 import { createBarberProfile } from "@/lib/barbers";
+import { SHOP_SLUG } from "@/lib/brand";
 import { SiteHeader } from "@/components/site-header";
 import { ButtonLink, SubmitButton } from "@/components/ui";
 
@@ -16,7 +17,7 @@ async function findInvite(token: string) {
     .select({ invite: invites, org: organizations })
     .from(invites)
     .innerJoin(organizations, eq(organizations.id, invites.orgId))
-    .where(and(eq(invites.token, token), isNull(invites.usedAt), gt(invites.expiresAt, new Date())))
+    .where(and(eq(organizations.slug, SHOP_SLUG), eq(invites.token, token), isNull(invites.usedAt), gt(invites.expiresAt, new Date())))
     .limit(1);
   return row ?? null;
 }
@@ -35,7 +36,7 @@ async function accept(fd: FormData) {
     const used = await tx
       .update(invites)
       .set({ usedAt: new Date(), usedBy: user.id })
-      .where(and(eq(invites.id, invite.id), isNull(invites.usedAt)))
+      .where(and(eq(invites.id, invite.id), isNull(invites.usedAt), gt(invites.expiresAt, new Date())))
       .returning({ id: invites.id });
     if (!used.length) return;
     const [existing] = await tx

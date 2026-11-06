@@ -5,17 +5,13 @@ import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { barberPhotos, barbers } from "@/db/schema";
-import { requireMember, slugify } from "@/lib/tenant";
+import { slugify } from "@/lib/tenant";
+import { requireManagedBarber } from "@/lib/managed-barber";
 import { deleteImage, saveImage, validateImage } from "@/lib/upload";
 import { firstError, formObject, instagramHandle, pgErrorCode, type FormState } from "@/lib/forms";
 
 const MAX_PHOTOS = 30;
-
-async function myBarber(slug: string) {
-  const ctx = await requireMember(slug);
-  if (!ctx.barber) throw new Error("Você não tem perfil de barbeiro nesta barbearia.");
-  return { ...ctx, barber: ctx.barber };
-}
+const captionSchema = z.string().trim().min(1).max(120);
 
 const year = new Date().getFullYear();
 const profileSchema = z.object({
@@ -29,7 +25,7 @@ const profileSchema = z.object({
 
 export async function saveProfile(_: FormState, fd: FormData): Promise<FormState> {
   const slug = String(fd.get("slug"));
-  const { org, barber } = await myBarber(slug);
+  const { org, barber } = await requireManagedBarber(slug, String(fd.get("barberId") ?? "") || undefined);
   const parsed = profileSchema.safeParse(formObject(fd));
   if (!parsed.success) return { error: firstError(parsed.error) };
   const d = parsed.data;
@@ -44,6 +40,7 @@ export async function saveProfile(_: FormState, fd: FormData): Promise<FormState
   if (avatar instanceof File && avatar.size > 0) {
     const err = validateImage(avatar);
     if (err) return { error: err };
+    if (process.env.NODE_ENV === "production" && !process.env.BLOB_READ_WRITE_TOKEN) return { error: "O armazenamento de fotos ainda não está configurado." };
     avatarUrl = await saveImage(avatar, `${org.id}/avatars`);
   }
 
@@ -66,11 +63,13 @@ export async function saveProfile(_: FormState, fd: FormData): Promise<FormState
       })
       .where(and(eq(barbers.id, barber.id), eq(barbers.orgId, org.id)));
   } catch (e) {
+    if (avatarUrl !== barber.avatarUrl) await deleteImage(avatarUrl);
     if (pgErrorCode(e) === "23505") return { error: "Esse endereço de perfil já é de outro barbeiro da casa." };
     throw e;
   }
   if (avatarUrl !== barber.avatarUrl) await deleteImage(barber.avatarUrl);
 
+  revalidatePath("/");
   revalidatePath(`/${slug}`, "layout");
   revalidatePath(`/painel/${slug}`, "layout");
   return { ok: "Perfil salvo." };
@@ -78,7 +77,9 @@ export async function saveProfile(_: FormState, fd: FormData): Promise<FormState
 
 export async function addPhoto(_: FormState, fd: FormData): Promise<FormState> {
   const slug = String(fd.get("slug"));
-  const { org, barber } = await myBarber(slug);
+  const { org, barber } = await requireManagedBarber(slug, String(fd.get("barberId") ?? "") || undefined);
+  const caption = captionSchema.safeParse(fd.get("caption"));
+  if (!caption.success) return { error: "Informe o nome do corte (até 120 caracteres)." };
   const file = fd.get("photo");
   const err = validateImage(file);
   if (err) return { error: err };
@@ -87,20 +88,36 @@ export async function addPhoto(_: FormState, fd: FormData): Promise<FormState> {
     .from(barberPhotos)
     .where(eq(barberPhotos.barberId, barber.id));
   if (n >= MAX_PHOTOS) return { error: `Limite de ${MAX_PHOTOS} fotos. Apague alguma antes.` };
+  if (process.env.NODE_ENV === "production" && !process.env.BLOB_READ_WRITE_TOKEN) return { error: "O armazenamento de fotos ainda não está configurado." };
   const url = await saveImage(file as File, `${org.id}/portfolio`);
-  const caption = String(fd.get("caption") ?? "").trim().slice(0, 120) || null;
-  await db.insert(barberPhotos).values({ barberId: barber.id, url, caption });
+  await db.insert(barberPhotos).values({ barberId: barber.id, url, caption: caption.data });
   revalidatePath(`/painel/${slug}/perfil`);
   revalidatePath(`/${slug}/${barber.handle}`);
   return { ok: "Foto publicada." };
 }
 
+export async function renamePhoto(_: FormState, fd: FormData): Promise<FormState> {
+  const slug = String(fd.get("slug"));
+  const { barber } = await requireManagedBarber(slug, String(fd.get("barberId") ?? "") || undefined);
+  const caption = captionSchema.safeParse(fd.get("caption"));
+  const id = z.uuid().safeParse(fd.get("id"));
+  if (!caption.success || !id.success) return { error: "Informe o nome do corte (até 120 caracteres)." };
+  const [photo] = await db.update(barberPhotos).set({ caption: caption.data })
+    .where(and(eq(barberPhotos.id, id.data), eq(barberPhotos.barberId, barber.id))).returning({ id: barberPhotos.id });
+  if (!photo) return { error: "Foto não encontrada." };
+  revalidatePath(`/painel/${slug}/perfil`);
+  revalidatePath(`/${slug}/${barber.handle}`);
+  return { ok: "Nome do corte atualizado." };
+}
+
 export async function deletePhoto(fd: FormData) {
   const slug = String(fd.get("slug"));
-  const { barber } = await myBarber(slug);
+  const { barber } = await requireManagedBarber(slug, String(fd.get("barberId") ?? "") || undefined);
+  const id = z.uuid().safeParse(fd.get("id"));
+  if (!id.success) return;
   const [photo] = await db
     .delete(barberPhotos)
-    .where(and(eq(barberPhotos.id, String(fd.get("id"))), eq(barberPhotos.barberId, barber.id)))
+    .where(and(eq(barberPhotos.id, id.data), eq(barberPhotos.barberId, barber.id)))
     .returning();
   if (photo) await deleteImage(photo.url);
   revalidatePath(`/painel/${slug}/perfil`);

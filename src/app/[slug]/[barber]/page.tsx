@@ -56,7 +56,7 @@ export default async function BarberPage({ params, searchParams }: PageProps<"/[
       .from(services)
       .where(and(eq(services.orgId, org.id), eq(services.active, true)))
       .orderBy(asc(services.sort), asc(services.name)),
-    db.select().from(barberPhotos).where(eq(barberPhotos.barberId, barber.id)).orderBy(desc(barberPhotos.createdAt)),
+    db.select().from(barberPhotos).where(and(eq(barberPhotos.barberId, barber.id), sql`length(btrim(${barberPhotos.caption})) > 0`)).orderBy(desc(barberPhotos.createdAt)),
     db
       .select({ served: sql<number>`count(*)::int` })
       .from(appointments)
@@ -203,7 +203,7 @@ export default async function BarberPage({ params, searchParams }: PageProps<"/[
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={p.url} alt={p.caption ?? ""} loading="lazy" className="h-full w-full object-cover transition group-hover:scale-[1.03]" />
                   {p.caption && (
-                    <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 p-2 text-xs text-white opacity-0 transition group-hover:opacity-100">
+                    <span className="absolute inset-x-0 bottom-0 bg-black/75 p-2 text-sm font-medium text-white">
                       {p.caption}
                     </span>
                   )}
