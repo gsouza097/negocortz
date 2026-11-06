@@ -60,7 +60,7 @@ export async function ShopLanding() {
           <div className="mx-auto grid max-w-6xl items-center gap-8 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr] md:py-16">
             <div>
               <p className="mb-4 font-mono text-xs uppercase tracking-[0.2em] text-sky">Corte · Barba · Estilo</p>
-              <h1 className="font-display text-[clamp(46px,8vw,96px)] leading-[0.9]">Barbearia<br />Nego Cortez</h1>
+              <h1 className="font-display text-[clamp(46px,8vw,96px)] leading-[0.9]">Barbearia<br />Nego Cortz</h1>
               <p className="mt-5 max-w-lg text-lg leading-relaxed text-white/75">Seu estilo começa na cadeira. Escolha seu barbeiro e marque um horário para um atendimento no seu ritmo, com atenção ao corte e ao acabamento.</p>
               <a href="#equipe" className={`${buttonClass({ variant: "accent", size: "lg" })} mt-7`}>Agendar meu horário</a>
             </div>

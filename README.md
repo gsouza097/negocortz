@@ -1,6 +1,6 @@
-# Barbearia Nego Cortez
+# Barbearia Nego Cortz
 
-Site e Web App de agendamento da Barbearia Nego Cortez. Clientes se cadastram e reservam horários. O administrador gerencia serviços, preços e equipe. Cada barbeiro também pode editar seu perfil, portfólio e expediente.
+Site e Web App de agendamento da Barbearia Nego Cortz. Clientes se cadastram e reservam horários. O administrador gerencia serviços, preços e equipe. Cada barbeiro também pode editar seu perfil, portfólio e expediente.
 
 ## Desenvolvimento local
 

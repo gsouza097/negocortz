@@ -26,7 +26,7 @@ async function main() {
       await tx.insert(memberships).values({ orgId: org.id, userId: ownerId, role: "owner" })
         .onConflictDoUpdate({ target: [memberships.orgId, memberships.userId], set: { role: "owner" } });
     });
-    console.log("Administrador da Barbearia Nego Cortez configurado.");
+    console.log("Administrador da Barbearia Nego Cortz configurado.");
   } finally {
     await client.end();
   }

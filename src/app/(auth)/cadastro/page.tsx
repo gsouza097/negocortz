@@ -13,7 +13,7 @@ export default async function SignUpPage({ searchParams }: PageProps<"/cadastro"
   return (
     <>
       <h1 className="font-display text-5xl">Criar conta</h1>
-      <p className="mt-2 mb-8 text-ink-2">Crie sua conta para reservar na Barbearia Nego Cortez.</p>
+      <p className="mt-2 mb-8 text-ink-2">Crie sua conta para reservar na Barbearia Nego Cortz.</p>
       <AuthForm mode="cadastro" next={nextPath} />
     </>
   );

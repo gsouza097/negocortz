@@ -17,7 +17,7 @@ const plexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: { default: `${SHOP_NAME} · Agendamento`, template: `%s · ${SHOP_NAME}` },
-  description: "Conheça a equipe da Nego Cortez, escolha seu barbeiro e agende seu horário online.",
+  description: "Conheça a equipe da Nego Cortz, escolha seu barbeiro e agende seu horário online.",
   icons: SHOP_LOGO,
 };
 
