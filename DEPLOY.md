@@ -51,6 +51,16 @@ Abra a URL do projeto: a landing aparece em `/`. Provisione a conta do dono conf
 - **Domínio próprio:** *Settings → Domains*. As barbearias ficam em `seudominio.com/{slug}`.
 - **Fuso horário:** a barbearia usa `America/Sao_Paulo`. Para outro fuso, altere a coluna `timezone` em `organizations` (ainda não há campo na tela).
 
+## WhatsApp da barbearia
+
+Configure o número na [WhatsApp Business Platform](https://whatsappbusiness.com/products/business-platform/) e preencha as variáveis de produção da Vercel listadas em `.env.example`. Use a versão da Graph API indicada no painel da Meta, o ID do número, o token de acesso, o segredo do app e um token de verificação escolhido para o webhook. Configure um telefone de atendimento humano em `WHATSAPP_HUMAN_PHONE` no formato 55 + DDD + número, de preferência um contato direto da equipe.
+
+Use `https://negocortz.vercel.app/api/whatsapp` como URL de callback e assine o evento `messages`. O webhook verifica a assinatura da Meta. Para a interpretação de pedidos, configure `OPENAI_API_KEY` e um modelo com suporte a Structured Outputs na Responses API em `WHATSAPP_OPENAI_MODEL`. Configure os segredos na Vercel. O número de teste da Meta deve ser usado primeiro.
+
+Cadastre dois modelos de utilidade em português do Brasil no WhatsApp Manager e informe os nomes em `WHATSAPP_CONFIRM_TEMPLATE` e `WHATSAPP_REMINDER_TEMPLATE`. Use quatro variáveis no corpo, nesta ordem: serviço, barbeiro, data e hora. Exemplo de lembrete: "Lembrete da Nego Cortz: {{1}} com {{2}}, em {{3}} às {{4}}. Para deixar de receber mensagens, responda PARAR."
+
+Configure `CRON_SECRET` na Vercel para habilitar o endpoint de notificações. A configuração padrão roda diariamente às 12h UTC (9h em São Paulo), procura as reservas do dia seguinte e tenta reenviar confirmações pendentes. No plano Hobby, o disparo diário pode ocorrer ao longo daquela hora. A caixa de autorização aparece no site e no painel quando os modelos e o agendador estiverem configurados. No WhatsApp, o cliente autoriza ao confirmar a reserva. O cliente pode escrever `PARAR` para interromper as mensagens das reservas atuais.
+
 ## Variáveis de ambiente
 
 | Variável | Criada por | Uso |

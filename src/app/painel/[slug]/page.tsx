@@ -1,3 +1,4 @@
+import { appointmentMessagesEnabled } from "@/lib/whatsapp/notifications";
 import { requestTime } from "@/lib/clock";
 import Link from "next/link";
 import { and, asc, eq, gte, inArray, lt } from "drizzle-orm";
@@ -126,7 +127,7 @@ export default async function AgendaPage({ params, searchParams }: PageProps<"/p
             <button className={buttonClass({ variant: "outline", size: "sm" })}>Ver horários do dia</button>
           </form>
           {serviceList.length ? (
-            <ManualBookingForm key={day} slug={slug} date={day} timezone={tz} barbers={barberAgendas} services={serviceList} rules={rules} />
+            <ManualBookingForm key={day} slug={slug} date={day} timezone={tz} barbers={barberAgendas} services={serviceList} rules={rules} whatsappEnabled={appointmentMessagesEnabled()} />
           ) : (
             <ButtonLink href={`/painel/${slug}/servicos`} size="sm">Cadastrar serviço</ButtonLink>
           )}

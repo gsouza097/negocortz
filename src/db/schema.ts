@@ -4,6 +4,7 @@ import {
   check,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   smallint,
@@ -211,6 +212,9 @@ export const appointments = pgTable(
     }),
     guestName: text("guest_name"),
     guestPhone: text("guest_phone"),
+    whatsappPhone: text("whatsapp_phone"),
+    whatsappConfirmedAt: timestamp("whatsapp_confirmed_at", { withTimezone: true }),
+    whatsappRemindedAt: timestamp("whatsapp_reminded_at", { withTimezone: true }),
     serviceId: uuid("service_id").references(() => services.id, {
       onDelete: "set null",
     }),
@@ -229,6 +233,19 @@ export const appointments = pgTable(
     check("appointments_range_ck", sql`${t.startsAt} < ${t.endsAt}`),
   ],
 );
+
+export const whatsappConversations = pgTable("whatsapp_conversations", {
+  sender: text("sender").primaryKey(),
+  state: jsonb("state").$type<unknown>().notNull().default({}),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const whatsappMessages = pgTable("whatsapp_messages", {
+  id: text("id").primaryKey(),
+  reply: text("reply").notNull().default(""),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  createdAt: createdAt(),
+});
 
 /* ---------- Relações ---------- */
 

@@ -1,5 +1,7 @@
 "use server";
 
+import { after } from "next/server";
+import { tryAppointmentConfirmation } from "@/lib/whatsapp/notifications";
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
@@ -91,12 +93,13 @@ const manualBookingSchema = z.object({
   start: z.coerce.number().int().positive("Escolha um horário disponível."),
   guestName: z.string().trim().min(2, "Informe o nome do cliente.").max(80),
   guestPhone: whatsAppSchema,
+  whatsappOptIn: z.literal("on").optional(),
 });
 
 export async function addManualBooking(_: FormState, fd: FormData): Promise<FormState> {
   const parsed = manualBookingSchema.safeParse(formObject(fd));
   if (!parsed.success) return { error: firstError(parsed.error) };
-  const { slug, barberId, serviceId, date, start, guestName, guestPhone } = parsed.data;
+  const { slug, barberId, serviceId, date, start, guestName, guestPhone, whatsappOptIn } = parsed.data;
   const { org } = await requireMember(slug, ["owner"]);
 
   const [[barber], [service]] = await Promise.all([
@@ -119,7 +122,7 @@ export async function addManualBooking(_: FormState, fd: FormData): Promise<Form
   }
 
   try {
-    await db.insert(appointments).values({
+    const [appointment] = await db.insert(appointments).values({
       orgId: org.id,
       barberId,
       serviceId,
@@ -127,9 +130,11 @@ export async function addManualBooking(_: FormState, fd: FormData): Promise<Form
       priceCents: service.priceCents,
       guestName,
       guestPhone,
+      whatsappPhone: whatsappOptIn ? guestPhone : null,
       startsAt: new Date(start),
       endsAt: new Date(start + service.durationMin * 60_000),
-    });
+    }).returning({ id: appointments.id });
+    if (whatsappOptIn) after(() => tryAppointmentConfirmation(appointment.id));
   } catch (error) {
     if (pgErrorCode(error) === "23P01") {
       refreshAgenda(slug);

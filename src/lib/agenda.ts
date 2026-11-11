@@ -1,6 +1,6 @@
 import "server-only";
 import { and, asc, eq, gt, inArray, lt } from "drizzle-orm";
-import { db } from "@/db";
+import { db, type DB } from "@/db";
 import { appointments, workingHours, type Organization } from "@/db/schema";
 import { addDaysISO, localDateISO, weekdayOfISO, zonedToMs } from "./time";
 import type { AgendaDay, AgendaRules } from "./slots";
@@ -25,18 +25,19 @@ export async function loadAgenda(
   barberId: string,
   fromISO: string,
   days: number,
+  database: Pick<DB, "select"> = db,
 ): Promise<AgendaDay[]> {
   const tz = org.timezone;
   const rangeStart = zonedToMs(fromISO, 0, tz);
   const rangeEnd = zonedToMs(addDaysISO(fromISO, days), 0, tz);
 
   const [hours, busy] = await Promise.all([
-    db
+    database
       .select()
       .from(workingHours)
       .where(eq(workingHours.barberId, barberId))
       .orderBy(asc(workingHours.startMin)),
-    db
+    database
       .select({ start: appointments.startsAt, end: appointments.endsAt })
       .from(appointments)
       .where(

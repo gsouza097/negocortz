@@ -1,3 +1,4 @@
+import { appointmentMessagesEnabled } from "@/lib/whatsapp/notifications";
 import { requestTime } from "@/lib/clock";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -44,11 +45,13 @@ export default async function BarberPage({ params, searchParams }: PageProps<"/[
 
   const now = requestTime();
   const today = localDateISO(now, org.timezone);
-  const lastStart = addDaysISO(today, Math.max(org.bookingWindowDays - 6, 0));
-  let from = isISODate(sp.de) ? sp.de : today;
-  if (from < today) from = today;
-  if (from > lastStart) from = lastStart;
-  const offset = diffDaysISO(from, today);
+  const lastDay = addDaysISO(today, org.bookingWindowDays);
+  const requestedDay = isISODate(sp.de) ? sp.de : today;
+  const selectedDay = requestedDay < today ? today : requestedDay > lastDay ? lastDay : requestedDay;
+  const month = selectedDay.slice(0, 7) + "-01";
+  const nextMonth = addDaysISO(month, 32).slice(0, 7) + "-01";
+  const from = month < today ? today : month;
+  const count = Math.min(diffDaysISO(nextMonth, from), diffDaysISO(lastDay, from) + 1);
 
   const [svcList, photos, [{ served }], days, user] = await Promise.all([
     db
@@ -68,7 +71,7 @@ export default async function BarberPage({ params, searchParams }: PageProps<"/[
           lt(appointments.endsAt, new Date(now)),
         ),
       ),
-    loadAgenda(org, barber.id, from, 7),
+    loadAgenda(org, barber.id, from, count),
     getUser(),
   ]);
 
@@ -158,7 +161,8 @@ export default async function BarberPage({ params, searchParams }: PageProps<"/[
             </p>
           ) : (
             <BookingAgenda
-              key={from}
+              key={selectedDay}
+              path={path}
               slug={slug}
               barberId={barber.id}
               barberName={barber.displayName.split(" ")[0]}
@@ -166,11 +170,13 @@ export default async function BarberPage({ params, searchParams }: PageProps<"/[
               services={svcList}
               days={days}
               rules={agendaRules(org, now)}
-              now={now}
+              today={today}
+              lastDay={lastDay}
+              initialDay={selectedDay}
               initialServiceId={typeof sp.servico === "string" ? sp.servico : undefined}
-              prevFrom={offset > 0 ? addDaysISO(from, -Math.min(7, offset)) : null}
-              nextFrom={from < lastStart ? addDaysISO(from, Math.min(7, diffDaysISO(lastStart, from))) : null}
-              loginHref={user ? null : `/entrar?next=${encodeURIComponent(path)}`}
+              initialStart={typeof sp.horario === "string" ? Number(sp.horario) : undefined}
+              signedIn={!!user}
+              whatsappEnabled={appointmentMessagesEnabled()}
             />
           )}
         </section>

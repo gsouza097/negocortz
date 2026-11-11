@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { tryAppointmentConfirmation } from "@/lib/whatsapp/notifications";
 import { redirect } from "next/navigation";
 import { and, eq, gt, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -22,12 +24,13 @@ const schema = z.object({
   serviceId: z.uuid(),
   start: z.coerce.number().int().positive(),
   note: z.string().trim().max(280).optional(),
+  whatsappOptIn: z.literal("on").optional(),
 });
 
 export async function bookAppointment(_: FormState, fd: FormData): Promise<FormState> {
   const parsed = schema.safeParse(formObject(fd));
   if (!parsed.success) return { error: "Reserva inválida. Recarregue a página." };
-  const { slug, barberId, serviceId, start, note } = parsed.data;
+  const { slug, barberId, serviceId, start, note, whatsappOptIn } = parsed.data;
 
   const user = await getUser();
   if (!user) redirect(`/entrar?next=/${slug}`);
@@ -48,7 +51,8 @@ export async function bookAppointment(_: FormState, fd: FormData): Promise<FormS
   ]);
   if (!barber || !service) return { error: "Barbeiro ou serviço indisponível." };
   const profilePath = `/${slug}/${barber.handle}`;
-  if (!normalizeWhatsApp(user.phone)) redirect(phoneSetupPath(`${profilePath}#agenda`));
+  const phone = normalizeWhatsApp(user.phone);
+  if (!phone) redirect(phoneSetupPath(`${profilePath}?de=${localDateISO(start, org.timezone)}&servico=${serviceId}&horario=${start}#agenda`));
 
   // revalida no servidor com a mesma regra que desenhou a agenda
   const date = localDateISO(start, org.timezone);
@@ -85,6 +89,7 @@ export async function bookAppointment(_: FormState, fd: FormData): Promise<FormS
         serviceName: service.name,
         priceCents: service.priceCents,
         note: note || null,
+        whatsappPhone: whatsappOptIn ? phone : null,
         startsAt: new Date(start),
         endsAt: new Date(start + service.durationMin * 60_000),
       })
@@ -102,6 +107,7 @@ export async function bookAppointment(_: FormState, fd: FormData): Promise<FormS
     throw e;
   }
 
+  if (whatsappOptIn) after(() => tryAppointmentConfirmation(id));
   revalidatePath(profilePath);
   redirect(`/minhas-reservas?nova=${id}`);
 }

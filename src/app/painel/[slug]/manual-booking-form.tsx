@@ -9,13 +9,14 @@ import { addManualBooking } from "./actions";
 type Barber = { id: string; name: string; agenda: AgendaDay };
 type Service = { id: string; name: string; durationMin: number; priceCents: number };
 
-export function ManualBookingForm({ slug, date, timezone, barbers, services, rules }: {
+export function ManualBookingForm({ slug, date, timezone, barbers, services, rules, whatsappEnabled }: {
   slug: string;
   date: string;
   timezone: string;
   barbers: Barber[];
   services: Service[];
   rules: AgendaRules;
+  whatsappEnabled: boolean;
 }) {
   const [barberId, setBarberId] = useState(barbers[0]?.id ?? "");
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
@@ -71,6 +72,10 @@ export function ManualBookingForm({ slug, date, timezone, barbers, services, rul
       <Field label="WhatsApp do cliente">
         <Input name="guestPhone" type="tel" placeholder="(11) 91234-5678" required maxLength={30} value={phone} onChange={(event) => setPhone(event.target.value)} />
       </Field>
+      {whatsappEnabled && <label className="flex items-start gap-2 text-sm text-ink-2 sm:col-span-2">
+        <input type="checkbox" name="whatsappOptIn" className="mt-0.5 size-4" />
+        O cliente autorizou receber a confirmação e o lembrete pelo WhatsApp.
+      </label>}
       <div className="space-y-3 sm:col-span-2">
         <FormMessage state={state} />
         <SubmitButton disabled={!selectedStart}>Confirmar agendamento</SubmitButton>

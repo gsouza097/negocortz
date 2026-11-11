@@ -1,305 +1,139 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useMemo, useState } from "react";
-import { bookableStarts, mergeIntervals, type AgendaDay, type AgendaRules } from "@/lib/slots";
-import {
-  fmtDateLong,
-  fmtDayMonth,
-  fmtDuration,
-  fmtMinutes,
-  fmtPrice,
-  fmtTime,
-  fmtWeekdayShort,
-  localDateISO,
-  localMinutes,
-} from "@/lib/time";
+import { useActionState, useState } from "react";
+import { bookableStarts, type AgendaDay, type AgendaRules } from "@/lib/slots";
+import { addDaysISO, fmtDateLong, fmtDuration, fmtPrice, fmtTime, localMinutes, weekdayOfISO, zonedToMs } from "@/lib/time";
 import { buttonClass, cx, FormMessage, SubmitButton, Textarea } from "@/components/ui";
 import { bookAppointment } from "./actions";
 
-type Svc = { id: string; name: string; durationMin: number; priceCents: number };
+type Service = { id: string; name: string; durationMin: number; priceCents: number };
+const monthFormat = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" });
+const weekdays = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+const periods = [{ name: "Manhã", start: 0, end: 720 }, { name: "Tarde", start: 720, end: 1080 }, { name: "Noite", start: 1080, end: 1440 }];
 
-const PX_PER_MIN = 1.25;
-
-export function BookingAgenda(props: {
+export function BookingAgenda({ slug, barberId, barberName, path, tz, services, days, rules, today, lastDay, initialDay, initialServiceId, initialStart, signedIn, whatsappEnabled }: {
   slug: string;
   barberId: string;
   barberName: string;
+  path: string;
   tz: string;
-  services: Svc[];
+  services: Service[];
   days: AgendaDay[];
   rules: AgendaRules;
-  now: number;
+  today: string;
+  lastDay: string;
+  initialDay: string;
   initialServiceId?: string;
-  prevFrom: string | null;
-  nextFrom: string | null;
-  loginHref: string | null;
+  initialStart?: number;
+  signedIn: boolean;
+  whatsappEnabled: boolean;
 }) {
-  const { tz, days, rules, now, services } = props;
-  const [serviceId, setServiceId] = useState(
-    services.some((s) => s.id === props.initialServiceId) ? props.initialServiceId! : services[0]?.id,
-  );
-  const [selected, setSelected] = useState<number | null>(null);
+  const [serviceId, setServiceId] = useState(initialServiceId);
+  const [day, setDay] = useState(initialDay);
+  const [start, setStart] = useState(initialStart);
   const [state, action] = useActionState(bookAppointment, undefined);
-  const service = services.find((s) => s.id === serviceId);
-
-  const bookable = useMemo(
-    () => days.map((d) => (service ? bookableStarts(d, service.durationMin, rules) : [])),
-    [days, service, rules],
-  );
-
-  // Faixa vertical da grade: do primeiro ao último minuto de expediente na semana.
-  const [minMin, maxMin] = useMemo(() => {
-    let lo = Infinity;
-    let hi = -Infinity;
-    for (const d of days)
-      for (const w of d.open) {
-        lo = Math.min(lo, localMinutes(w.start, tz));
-        const end = localDateISO(w.end, tz) === d.date ? localMinutes(w.end, tz) : 1440;
-        hi = Math.max(hi, end);
-      }
-    if (!Number.isFinite(lo)) return [9 * 60, 18 * 60];
-    return [Math.floor(lo / 60) * 60, Math.ceil(hi / 60) * 60];
-  }, [days, tz]);
-
-  const y = (ms: number, date: string) => {
-    const m = localDateISO(ms, tz) === date ? localMinutes(ms, tz) : ms > now ? 1440 : 0;
-    return (Math.min(Math.max(m, minMin), maxMin) - minMin) * PX_PER_MIN;
-  };
-  const height = (maxMin - minMin) * PX_PER_MIN;
-  const hours = Array.from({ length: (maxMin - minMin) / 60 + 1 }, (_, i) => minMin + i * 60);
-  const today = localDateISO(now, tz);
-  const totalFree = bookable.reduce((a, b) => a + b.length, 0);
-  const svcQs = serviceId ? `&servico=${serviceId}` : "";
+  const service = services.find((s) => s.id === serviceId) ?? services[0];
+  const freeByDay = new Map(days.map((item) => [item.date, bookableStarts(item, service.durationMin, rules)]));
+  const free = freeByDay.get(day) ?? [];
+  const selected = start && free.includes(start) ? start : undefined;
+  const month = initialDay.slice(0, 7) + "-01";
+  const lastOfMonth = addDaysISO(addDaysISO(month, 32).slice(0, 7) + "-01", -1);
+  const previous = addDaysISO(month, -1);
+  const previousMonth = previous.slice(0, 7) + "-01";
+  const next = addDaysISO(lastOfMonth, 1);
+  const blanks = (weekdayOfISO(month) + 6) % 7;
+  const dates = Array.from({ length: Number(lastOfMonth.slice(-2)) }, (_, index) => addDaysISO(month, index));
+  const dateLabel = (date: string) => fmtDateLong(zonedToMs(date, 720, tz), tz);
+  const agendaHref = (date: string, time?: number) => `${path}?de=${date}&servico=${service.id}${time ? `&horario=${time}` : ""}#agenda`;
 
   return (
-    <div>
-      {/* serviços */}
-      <fieldset>
-        <legend className="mb-3 text-sm font-semibold">1. Escolha o serviço</legend>
-        <div className="flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none]">
-          {services.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              aria-pressed={s.id === serviceId}
-              onClick={() => {
-                setServiceId(s.id);
-                setSelected(null);
-              }}
-              className={cx(
-                "shrink-0 rounded-2xl border px-4 py-2.5 text-left transition",
-                s.id === serviceId ? "border-ink bg-ink text-paper" : "border-line bg-white hover:border-ink/40",
-              )}
-            >
-              <span className="block text-sm font-semibold">{s.name}</span>
-              <span className={cx("font-mono text-xs", s.id === serviceId ? "text-paper/70" : "text-ink-2")}>
-                {fmtDuration(s.durationMin)} · {fmtPrice(s.priceCents)}
-              </span>
-            </button>
+    <div className="space-y-5">
+      <label className="block max-w-md space-y-2 text-sm font-semibold">
+        <span>Serviço</span>
+        <select value={service.id} onChange={(event) => { setServiceId(event.target.value); setStart(undefined); }}
+          className="min-h-12 w-full rounded-xl border border-line bg-white px-3 text-base">
+          {services.map((item) => (
+            <option key={item.id} value={item.id}>{item.name} · {fmtDuration(item.durationMin)} · {fmtPrice(item.priceCents)}</option>
           ))}
-        </div>
-      </fieldset>
+        </select>
+      </label>
 
-      {/* navegação da semana + legenda */}
-      <div className="mt-6 mb-3 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold">2. Escolha um horário livre</p>
-          <p className="text-xs text-ink-2">
-            {totalFree} horário{totalFree === 1 ? "" : "s"} para {service?.name.toLowerCase() ?? "—"} nestes 7 dias
-          </p>
-        </div>
-        <div className="flex items-center gap-1">
-          <WeekLink href={props.prevFrom && `?de=${props.prevFrom}${svcQs}#agenda`} label="Semana anterior">
-            ←
-          </WeekLink>
-          <WeekLink href={props.nextFrom && `?de=${props.nextFrom}${svcQs}#agenda`} label="Próxima semana">
-            →
-          </WeekLink>
-        </div>
-      </div>
-      <ul className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2">
-        <li className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded-sm border border-ink/30 bg-white" /> Livre
-        </li>
-        <li className="flex items-center gap-1.5">
-          <span className="busy-stripes h-3 w-3 rounded-sm" /> Ocupado
-        </li>
-        <li className="flex items-center gap-1.5">
-          <span className="closed-hatch h-3 w-3 rounded-sm border border-line" /> Fechado
-        </li>
-      </ul>
-
-      {/* grade semanal */}
-      <div className="overflow-x-auto rounded-2xl border border-line bg-paper-2/60">
-        <div className="grid min-w-[760px] grid-cols-[52px_repeat(7,minmax(96px,1fr))]">
-          <div className="sticky left-0 z-20 border-b border-line bg-paper-2" />
-          {days.map((d, i) => (
-            <div
-              key={d.date}
-              className={cx("border-b border-l border-line px-2 py-2.5 text-center", d.date === today && "bg-white")}
-            >
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-2">
-                {d.date === today ? "Hoje" : fmtWeekdayShort(d.date)}
-              </p>
-              <p className="font-display text-xl leading-none whitespace-nowrap sm:text-2xl">{fmtDayMonth(d.date)}</p>
-              <p className="mt-1 font-mono text-[10px] text-ink-2">
-                {d.open.length ? `${bookable[i].length} livres` : "fechado"}
-              </p>
-            </div>
-          ))}
-
-          <div className="sticky left-0 z-20 bg-paper-2" style={{ height }}>
-            {hours.map((h) => (
-              <span
-                key={h}
-                className="absolute right-2 -translate-y-1/2 font-mono text-[10px] text-ink-2"
-                style={{ top: (h - minMin) * PX_PER_MIN }}
-              >
-                {h < maxMin || h === minMin ? fmtMinutes(h) : ""}
-              </span>
-            ))}
+      <div className="grid items-start gap-4 md:grid-cols-2">
+        <section aria-label="Escolha o dia" className="rounded-2xl border border-line bg-white p-3 sm:p-5">
+          <div className="mb-3 grid grid-cols-[44px_1fr_44px] items-center gap-2">
+            {previous >= today ? <Link href={agendaHref(previousMonth < today ? today : previousMonth)} scroll={false} aria-label="Mês anterior" className="grid size-11 place-items-center rounded-xl border border-line">←</Link> : <span />}
+            <h3 className="text-center font-semibold capitalize">{monthFormat.format(new Date(month + "T12:00:00Z"))}</h3>
+            {next <= lastDay ? <Link href={agendaHref(next)} scroll={false} aria-label="Próximo mês" className="grid size-11 place-items-center rounded-xl border border-line">→</Link> : <span />}
           </div>
+          <div className="grid grid-cols-7 gap-1">
+            {weekdays.map((label) => <span key={label} className="py-1 text-center text-xs text-ink-2">{label}</span>)}
+            {Array.from({ length: blanks }, (_, index) => <span key={`blank-${index}`} />)}
+            {dates.map((date) => {
+              const available = !!freeByDay.get(date)?.length;
+              return (
+                <button key={date} type="button" disabled={date < today || date > lastDay}
+                  aria-label={`${dateLabel(date)}${available ? ", com horários livres" : ""}`} aria-pressed={date === day}
+                  onClick={() => { setDay(date); setStart(undefined); }}
+                  className={cx("relative min-h-11 rounded-lg text-sm font-semibold disabled:opacity-25",
+                    date === day ? "bg-ink text-white" : available ? "bg-cream text-steel hover:bg-sky" : "text-ink-2 hover:bg-paper-2")}>
+                  {Number(date.slice(-2))}
+                  {available && <span aria-hidden className="absolute bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full bg-current" />}
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
-          {days.map((d, i) => {
-            const busy = mergeIntervals(d.busy);
+        <section aria-label="Horários livres" className="rounded-2xl border border-line bg-white p-4 sm:p-5">
+          <h3 className="font-semibold first-letter:uppercase">{dateLabel(day)}</h3>
+          {!free.length && <p className="mt-3 text-sm text-ink-2">Nenhum horário livre neste dia. Escolha outra data no calendário.</p>}
+          {periods.map((period) => {
+            const times = free.filter((time) => {
+              const minutes = localMinutes(time, tz);
+              return minutes >= period.start && minutes < period.end;
+            });
+            if (!times.length) return null;
             return (
-              <div key={d.date} className="closed-hatch relative border-l border-line" style={{ height }}>
-                {hours.slice(1, -1).map((h) => (
-                  <div
-                    key={h}
-                    className="pointer-events-none absolute inset-x-0 border-t border-dashed border-line/80"
-                    style={{ top: (h - minMin) * PX_PER_MIN }}
-                  />
-                ))}
-                {d.open.map((w) => (
-                  <div
-                    key={w.start}
-                    className="absolute inset-x-0 bg-white"
-                    style={{ top: y(w.start, d.date), height: y(w.end, d.date) - y(w.start, d.date) }}
-                  />
-                ))}
-                {!d.open.length && (
-                  <p className="absolute inset-x-0 top-6 text-center text-xs font-semibold uppercase tracking-wider text-ink-3">
-                    Fechado
-                  </p>
-                )}
-                {d.date === today && (
-                  <div
-                    className="pointer-events-none absolute inset-x-0 top-0 z-[1] bg-paper-2/70"
-                    style={{ height: y(now, d.date) }}
-                  />
-                )}
-                {busy.map((b) => {
-                  const h = y(b.end, d.date) - y(b.start, d.date);
-                  return (
-                    <div
-                      key={b.start}
-                      className="busy-stripes absolute inset-x-1 z-[2] overflow-hidden rounded-lg px-1.5 py-1 text-[10px] font-semibold text-pole-ink"
-                      style={{ top: y(b.start, d.date) + 1, height: Math.max(h - 2, 6) }}
-                      title={`Ocupado ${fmtTime(b.start, tz)}–${fmtTime(b.end, tz)}`}
-                    >
-                      {h >= 30 && (
-                        <span className="rounded bg-white/85 px-1">
-                          Ocupado · {fmtTime(b.start, tz)}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-                {selected !== null && localDateISO(selected, tz) === d.date && service && (
-                  <div
-                    className="pointer-events-none absolute inset-x-1 z-[3] rounded-lg border-2 border-ink bg-ink/10"
-                    style={{
-                      top: y(selected, d.date),
-                      height: y(selected + service.durationMin * 60_000, d.date) - y(selected, d.date),
-                    }}
-                  />
-                )}
-                {bookable[i].map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setSelected(t === selected ? null : t)}
-                    aria-pressed={t === selected}
-                    aria-label={`${fmtDateLong(t, tz)}, ${fmtTime(t, tz)}`}
-                    className={cx(
-                      "absolute inset-x-1 z-[4] flex items-start rounded-lg px-1.5 pt-0.5 font-mono text-[11px] transition",
-                      t === selected
-                        ? "bg-ink text-paper"
-                        : "text-ink/70 hover:bg-moss/15 hover:text-ink focus-visible:bg-moss/15",
-                    )}
-                    style={{ top: y(t, d.date) + 1, height: rules.slotMinutes * PX_PER_MIN - 2 }}
-                  >
-                    {fmtTime(t, tz)}
-                  </button>
-                ))}
+              <div key={period.name} className="mt-4">
+                <p className="mb-2 text-xs font-semibold text-ink-2">{period.name}</p>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                  {times.map((time) => <button key={time} type="button" aria-pressed={time === selected} onClick={() => setStart(time)}
+                    className={cx("min-h-11 rounded-xl border px-1 font-mono text-sm",
+                      time === selected ? "border-ink bg-ink text-white" : "border-line hover:border-ink")}>{fmtTime(time, tz)}</button>)}
+                </div>
               </div>
             );
           })}
-        </div>
+        </section>
       </div>
 
-      {/* confirmação */}
-      {selected !== null && service && (
-        <div className="sticky bottom-3 z-30 mt-4">
-          <form
-            action={action}
-            className="rounded-2xl border border-ink bg-white p-4 shadow-[0_12px_40px_-12px_rgba(21,19,15,.35)] sm:p-5"
-          >
-            <input type="hidden" name="slug" value={props.slug} />
-            <input type="hidden" name="barberId" value={props.barberId} />
-            <input type="hidden" name="serviceId" value={service.id} />
-            <input type="hidden" name="start" value={selected} />
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-ink-2">
-                  {service.name} com {props.barberName}
-                </p>
-                <p className="font-display text-3xl leading-tight first-letter:uppercase">
-                  {fmtDateLong(selected, tz)}
-                </p>
-                <p className="font-mono text-sm">
-                  {fmtTime(selected, tz)}–{fmtTime(selected + service.durationMin * 60_000, tz)} ·{" "}
-                  {fmtPrice(service.priceCents)}
-                </p>
-              </div>
-              {props.loginHref ? (
-                <Link href={props.loginHref} className={buttonClass({ size: "lg" })}>
-                  Entrar para reservar
-                </Link>
-              ) : (
-                <SubmitButton size="lg" pending="Reservando…">
-                  Confirmar reserva
-                </SubmitButton>
-              )}
+      {selected !== undefined && (
+        <form action={action} className="space-y-3 rounded-2xl border border-ink bg-white p-4 sm:p-5">
+          <input type="hidden" name="slug" value={slug} />
+          <input type="hidden" name="barberId" value={barberId} />
+          <input type="hidden" name="serviceId" value={service.id} />
+          <input type="hidden" name="start" value={selected} />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold">{service.name} com {barberName}</p>
+              <p className="text-sm text-ink-2 first-letter:uppercase">{dateLabel(day)} · {fmtTime(selected, tz)} · {fmtPrice(service.priceCents)}</p>
             </div>
-            {!props.loginHref && (
-              <details className="mt-3 text-sm">
-                <summary className="cursor-pointer text-ink-2">Deixar um recado para o barbeiro</summary>
-                <Textarea name="note" maxLength={280} className="mt-2" placeholder="Ex.: quero manter o comprimento em cima" />
-              </details>
-            )}
-            <div className="mt-3 empty:hidden">
-              <FormMessage state={state} />
-            </div>
-          </form>
-        </div>
+            {signedIn ? <SubmitButton pending="Reservando…">Confirmar reserva</SubmitButton> :
+              <Link href={`/entrar?next=${encodeURIComponent(agendaHref(day, selected))}`} className={buttonClass({ size: "lg" })}>Entrar para reservar</Link>}
+          </div>
+          {signedIn && <details className="text-sm">
+            <summary className="cursor-pointer text-ink-2">Deixar um recado para o barbeiro</summary>
+            <Textarea name="note" maxLength={280} className="mt-2" placeholder="Ex.: quero manter o comprimento em cima" />
+          </details>}
+          {signedIn && whatsappEnabled && <label className="flex items-start gap-2 text-sm text-ink-2">
+            <input type="checkbox" name="whatsappOptIn" className="mt-0.5 size-4" />
+            Quero receber a confirmação e o lembrete desta reserva pelo WhatsApp.
+          </label>}
+          <FormMessage state={state} />
+        </form>
       )}
+      {selected === undefined && <FormMessage state={state} />}
     </div>
-  );
-}
-
-function WeekLink({ href, label, children }: { href: string | null; label: string; children: React.ReactNode }) {
-  if (!href)
-    return (
-      <span aria-disabled className={cx(buttonClass({ variant: "outline", size: "sm" }), "w-10 px-0 opacity-30")}>
-        {children}
-      </span>
-    );
-  return (
-    <Link href={href} scroll={false} aria-label={label} className={cx(buttonClass({ variant: "outline", size: "sm" }), "w-10 px-0")}>
-      {children}
-    </Link>
   );
 }
