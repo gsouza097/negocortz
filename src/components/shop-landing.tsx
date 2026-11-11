@@ -1,6 +1,6 @@
 import { requestTime } from "@/lib/clock";
 import Image from "next/image";
-import { SHOP_LOGO, SHOP_NAME, SHOP_SLUG } from "@/lib/brand";
+import { SHOP_DETAILS, SHOP_LOGO, SHOP_NAME, SHOP_SLUG } from "@/lib/brand";
 import { buttonClass } from "@/components/styles";
 import Link from "next/link";
 import { and, asc, eq } from "drizzle-orm";
@@ -17,6 +17,13 @@ import { SiteHeader } from "@/components/site-header";
 export async function ShopLanding() {
   const slug = SHOP_SLUG;
   const org = await getOrgBySlug(slug);
+  const address = org?.address || SHOP_DETAILS.address;
+  const city = org?.city || SHOP_DETAILS.city;
+  const phone = org?.phone || SHOP_DETAILS.phone;
+  const instagram = org?.instagram || SHOP_DETAILS.instagram;
+  const digits = phone.replace(/\D/g, "");
+  const phoneUri = digits.length === 10 || digits.length === 11 ? `+55${digits}` : `+${digits}`;
+  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${address}, ${city}`)}`;
 
   const [team, svcList] = org ? await Promise.all([
     db
@@ -68,37 +75,46 @@ export async function ShopLanding() {
           </div>
         </section>
 
-        {org && (org.description || org.address || org.city || org.phone || org.instagram) && (
-          <section aria-label="Sobre a barbearia" className="mx-auto grid max-w-6xl gap-5 px-4 pt-8 sm:px-6 md:grid-cols-2">
-            <p className="text-lg text-ink-2">{org.description}</p>
-            <ul className="space-y-3 text-[15px]">
-              {(org.address || org.city) && (
+        <section id="informacoes" aria-labelledby="informacoes-titulo" className="mx-auto max-w-6xl scroll-mt-20 px-4 pt-10 sm:px-6">
+          <div className="mb-5">
+            <h2 id="informacoes-titulo" className="font-display text-4xl leading-none sm:text-5xl">Sobre a barbearia</h2>
+            <p className="mt-3 max-w-2xl text-ink-2">{org?.description || SHOP_DETAILS.description}</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <section aria-label="Endereço e contato" className="rounded-2xl border border-line bg-white p-4 sm:p-5">
+              <h3 className="mb-4 text-lg font-bold">Endereço e contato</h3>
+              <ul className="space-y-3 text-[15px]">
                 <li className="flex gap-3">
-                  <PinIcon className="mt-0.5 h-5 w-5 shrink-0" />
-                  <span>
-                    {org.address}
-                    {org.address && org.city && <br />}
-                    <span className="text-ink-2">{org.city}</span>
-                  </span>
+                  <PinIcon className="mt-0.5 size-5 shrink-0" />
+                  <div>
+                    <p>{address}</p>
+                    <p className="text-ink-2">{city}</p>
+                    <a href={directionsUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block font-semibold text-steel underline underline-offset-4">Como chegar</a>
+                  </div>
                 </li>
-              )}
-              {org.phone && (
                 <li className="flex gap-3">
-                  <PhoneIcon className="h-5 w-5 shrink-0" />
-                  {org.phone}
+                  <PhoneIcon className="size-5 shrink-0" />
+                  <a href={`tel:${phoneUri}`} className="underline underline-offset-4">{phone}</a>
                 </li>
-              )}
-              {org.instagram && (
                 <li className="flex gap-3">
-                  <InstagramIcon className="h-5 w-5 shrink-0" />
-                  <a href={`https://instagram.com/${org.instagram}`} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">
-                    @{org.instagram}
-                  </a>
+                  <InstagramIcon className="size-5 shrink-0" />
+                  <a href={`https://instagram.com/${encodeURIComponent(instagram)}`} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">@{instagram}</a>
                 </li>
-              )}
-            </ul>
-          </section>
-        )}
+              </ul>
+            </section>
+            <section aria-label="Horário de funcionamento" className="rounded-2xl border border-line bg-white p-4 sm:p-5">
+              <h3 className="mb-2 text-lg font-bold">Horário de funcionamento</h3>
+              <dl className="divide-y divide-line text-sm">
+                {SHOP_DETAILS.hours.map(([day, time]) => (
+                  <div key={day} className="flex justify-between gap-3 py-2.5">
+                    <dt className="font-semibold">{day}</dt>
+                    <dd className="shrink-0 tabular-nums text-ink-2">{time}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          </div>
+        </section>
 
         <section id="equipe" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-12 sm:px-6">
           <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
