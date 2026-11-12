@@ -36,6 +36,13 @@
       "when": 1794411406723,
       "tag": "0004_whatsapp-booking",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794512087967,
+      "tag": "0005_weekly-bookings",
+      "breakpoints": true
     }
   ]
 }

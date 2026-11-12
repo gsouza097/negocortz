@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth/session";
-import { safeNext } from "@/lib/forms";
+import { loginHome, safeNext } from "@/lib/forms";
 import { AuthForm } from "../auth-form";
 
 export const metadata: Metadata = { title: "Entrar" };
@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Entrar" };
 export default async function SignInPage({ searchParams }: PageProps<"/entrar">) {
   const { next } = await searchParams;
   const nextPath = typeof next === "string" ? safeNext(next) : undefined;
-  if (await getUser()) redirect(nextPath ?? "/inicio");
+  if (await getUser()) redirect(loginHome(nextPath));
   return (
     <>
       <h1 className="font-display text-5xl">Entrar</h1>

@@ -1,17 +1,17 @@
 import { appointmentMessagesEnabled } from "@/lib/whatsapp/notifications";
 import { requestTime } from "@/lib/clock";
 import Link from "next/link";
-import { and, asc, eq, gte, inArray, lt } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lt } from "drizzle-orm";
 import { db } from "@/db";
-import { appointments, barbers, services, users } from "@/db/schema";
+import { appointments, barbers, services, users, weeklyBookings } from "@/db/schema";
 import { agendaRules, loadAgenda } from "@/lib/agenda";
 import { normalizeWhatsApp } from "@/lib/phone";
 import { requireMember } from "@/lib/tenant";
-import { addDaysISO, fmtDateLong, fmtPrice, fmtTime, isISODate, localDateISO, zonedToMs } from "@/lib/time";
+import { addDaysISO, fmtDateLong, fmtMinutes, fmtPrice, fmtTime, isISODate, localDateISO, weekdayOfISO, WEEKDAYS, zonedToMs } from "@/lib/time";
 import { Avatar } from "@/components/avatar";
 import { ButtonLink, Input } from "@/components/ui";
 import { buttonClass, cx } from "@/components/styles";
-import { cancelAppointment } from "./actions";
+import { cancelAppointment, cancelWeeklyBooking } from "./actions";
 import { BlockForm } from "./block-form";
 import { ManualBookingForm } from "./manual-booking-form";
 
@@ -33,9 +33,9 @@ export default async function AgendaPage({ params, searchParams }: PageProps<"/p
 
   const rules = agendaRules(org, now);
   const canBookManually = role === "owner" && team.length > 0;
-  const [rows, serviceList, barberAgendas] = await Promise.all([
+  const [rows, serviceList, barberAgendas, weeklyList] = await Promise.all([
     team.length
-    ? await db
+    ? db
         .select({
           id: appointments.id,
           barberId: appointments.barberId,
@@ -50,6 +50,7 @@ export default async function AgendaPage({ params, searchParams }: PageProps<"/p
           clientPhone: users.phone,
           guestName: appointments.guestName,
           guestPhone: appointments.guestPhone,
+          weeklyBookingId: appointments.weeklyBookingId,
         })
         .from(appointments)
         .leftJoin(users, eq(users.id, appointments.clientId))
@@ -73,6 +74,12 @@ export default async function AgendaPage({ params, searchParams }: PageProps<"/p
           const [agenda] = await loadAgenda(org, barber.id, day, 1);
           return { id: barber.id, name: barber.displayName, agenda };
         }))
+      : [],
+    role === "owner"
+      ? db.select({ series: weeklyBookings, barberName: barbers.displayName, barberActive: barbers.active })
+          .from(weeklyBookings).innerJoin(barbers, eq(barbers.id, weeklyBookings.barberId))
+          .where(and(eq(weeklyBookings.orgId, org.id), isNull(weeklyBookings.endedAt)))
+          .orderBy(asc(weeklyBookings.guestName))
       : [],
   ]);
 
@@ -134,6 +141,35 @@ export default async function AgendaPage({ params, searchParams }: PageProps<"/p
         </section>
       )}
 
+      {weeklyList.length > 0 && (
+        <section aria-labelledby="horarios-fixos" className="mt-8 max-w-2xl rounded-3xl border border-line bg-white p-5">
+          <h2 id="horarios-fixos" className="font-display text-3xl">Horários fixos ativos</h2>
+          <ul className="mt-3 divide-y divide-line">
+            {weeklyList.map(({ series, barberName, barberActive }) => (
+              <li key={series.id} className="space-y-2 py-3">
+                <p className="font-semibold">{series.guestName}</p>
+                <p className="text-sm text-ink-2">
+                  {WEEKDAYS[weekdayOfISO(series.firstDate)]} às {fmtMinutes(series.startMinute)} · {series.serviceName} com {barberName}
+                </p>
+                {!barberActive && <p className="text-sm text-pole">O barbeiro está pausado. A renovação volta quando ele for reativado.</p>}
+                {series.conflictDate && <p className="text-sm text-pole">
+                  Horário indisponível em {fmtDateLong(zonedToMs(series.conflictDate, 720, series.timezone), series.timezone)}.
+                </p>}
+                <details className="text-sm">
+                  <summary className="cursor-pointer text-pole">Encerrar horário fixo</summary>
+                  <form action={cancelWeeklyBooking} className="mt-2 space-y-2">
+                    <input type="hidden" name="slug" value={slug} />
+                    <input type="hidden" name="id" value={series.id} />
+                    <p>As reservas futuras serão canceladas.</p>
+                    <button className={buttonClass({ variant: "danger", size: "sm" })}>Confirmar encerramento</button>
+                  </form>
+                </details>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {team.length === 0 ? (
         <div className="mt-8 rounded-3xl border border-dashed border-line p-8">
           <p className="font-semibold">Nenhum barbeiro ativo ainda.</p>
@@ -185,7 +221,7 @@ export default async function AgendaPage({ params, searchParams }: PageProps<"/p
                                   {r.serviceName}
                                   {r.priceCents != null && ` · ${fmtPrice(r.priceCents)}`}
                                 </p>
-                                {r.guestName && <p className="text-xs text-ink-2">Agendamento manual</p>}
+                                {r.guestName && <p className="text-xs text-ink-2">{r.weeklyBookingId ? "Horário fixo semanal" : "Agendamento manual"}</p>}
                                 {whatsapp ? (
                                   <a
                                     className="text-sm text-moss underline underline-offset-4"
@@ -206,7 +242,7 @@ export default async function AgendaPage({ params, searchParams }: PageProps<"/p
                               <input type="hidden" name="slug" value={slug} />
                               <input type="hidden" name="id" value={r.id} />
                               <button className={buttonClass({ variant: "danger", size: "sm" })}>
-                                {r.kind === "block" ? "Liberar" : "Cancelar"}
+                                {r.kind === "block" ? "Liberar" : r.weeklyBookingId ? "Cancelar esta semana" : "Cancelar"}
                               </button>
                             </form>
                           )}

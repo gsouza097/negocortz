@@ -8,7 +8,7 @@ import { users } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { normalizeWhatsApp, whatsAppSchema } from "@/lib/phone";
 import { createSession, destroySession, getUser, needsCustomerPhone, phoneSetupPath } from "@/lib/auth/session";
-import { firstError, formObject, pgErrorCode, safeNext, type FormState } from "@/lib/forms";
+import { firstError, formObject, loginHome, pgErrorCode, safeNext, type FormState } from "@/lib/forms";
 
 const signUpSchema = z.object({
   name: z.string().trim().min(2, "Informe seu nome.").max(80),
@@ -32,7 +32,7 @@ export async function signUp(_: FormState, fd: FormData): Promise<FormState> {
     if (pgErrorCode(e) === "23505") return { error: "Já existe uma conta com esse e-mail.", fields };
     throw e;
   }
-  redirect(safeNext(fields.next, "/inicio"));
+  redirect(loginHome(fields.next));
 }
 
 const signInSchema = z.object({
@@ -49,7 +49,7 @@ export async function signIn(_: FormState, fd: FormData): Promise<FormState> {
   if (!user || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
     return { error: "E-mail ou senha incorretos.", fields: { email: fields.email ?? "" } };
   }
-  const next = safeNext(fields.next, "/inicio");
+  const next = loginHome(fields.next);
   const missingPhone = await needsCustomerPhone(user.id, user.phone);
   await createSession(user.id);
   redirect(missingPhone ? phoneSetupPath(next) : next);

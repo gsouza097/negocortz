@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { Field, FormMessage, Input, Select, SubmitButton } from "@/components/ui";
 import { bookableStarts, type AgendaDay, type AgendaRules } from "@/lib/slots";
-import { fmtDuration, fmtPrice, fmtTime } from "@/lib/time";
+import { addDaysISO, fmtDayMonth, fmtDuration, fmtPrice, fmtTime, localDateISO } from "@/lib/time";
 import { addManualBooking } from "./actions";
 
 type Barber = { id: string; name: string; agenda: AgendaDay };
@@ -23,12 +23,14 @@ export function ManualBookingForm({ slug, date, timezone, barbers, services, rul
   const [start, setStart] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [weekly, setWeekly] = useState(false);
   const [state, action] = useActionState(async (previous: Awaited<ReturnType<typeof addManualBooking>>, data: FormData) => {
     const result = await addManualBooking(previous, data);
     if (result?.ok) {
       setName("");
       setPhone("");
       setStart("");
+      setWeekly(false);
     }
     return result;
   }, undefined);
@@ -37,6 +39,11 @@ export function ManualBookingForm({ slug, date, timezone, barbers, services, rul
   const service = services.find((item) => item.id === serviceId) ?? services[0];
   const starts = barber && service ? bookableStarts(barber.agenda, service.durationMin, rules) : [];
   const selectedStart = starts.some((time) => String(time) === start) ? start : "";
+  const initialDates: string[] = [];
+  if (weekly && selectedStart) {
+    const last = addDaysISO(localDateISO(rules.latest - 1, timezone), 28);
+    for (let occurrence = date; occurrence <= last; occurrence = addDaysISO(occurrence, 7)) initialDates.push(occurrence);
+  }
 
   return (
     <form action={action} className="grid min-w-0 gap-3 sm:grid-cols-2">
@@ -72,13 +79,22 @@ export function ManualBookingForm({ slug, date, timezone, barbers, services, rul
       <Field label="WhatsApp do cliente">
         <Input name="guestPhone" type="tel" placeholder="(11) 91234-5678" required maxLength={30} value={phone} onChange={(event) => setPhone(event.target.value)} />
       </Field>
-      {whatsappEnabled && <label className="flex items-start gap-2 text-sm text-ink-2 sm:col-span-2">
+      <label className="flex items-start gap-2 text-sm sm:col-span-2">
+        <input type="checkbox" name="weekly" checked={weekly} onChange={(event) => setWeekly(event.target.checked)} className="mt-0.5 size-4" />
+        <span><strong>Horário fixo semanal</strong><br />Repete no mesmo dia e horário enquanto o plano estiver ativo. Você controla o pagamento fora do sistema.</span>
+      </label>
+      {initialDates.length > 0 && (
+        <p className="rounded-xl bg-paper px-3 py-2 text-sm text-ink-2 sm:col-span-2">
+          Datas iniciais às {fmtTime(Number(selectedStart), timezone)}: {initialDates.map(fmtDayMonth).join(", ")}.
+        </p>
+      )}
+      {whatsappEnabled && !weekly && <label className="flex items-start gap-2 text-sm text-ink-2 sm:col-span-2">
         <input type="checkbox" name="whatsappOptIn" className="mt-0.5 size-4" />
         O cliente autorizou receber a confirmação e o lembrete pelo WhatsApp.
       </label>}
       <div className="space-y-3 sm:col-span-2">
         <FormMessage state={state} />
-        <SubmitButton disabled={!selectedStart}>Confirmar agendamento</SubmitButton>
+        <SubmitButton disabled={!selectedStart}>{weekly ? "Criar horário fixo" : "Confirmar agendamento"}</SubmitButton>
       </div>
     </form>
   );

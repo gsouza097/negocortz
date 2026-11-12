@@ -14,7 +14,7 @@ import { Avatar } from "@/components/avatar";
 import { ArrowIcon, InstagramIcon, PhoneIcon, PinIcon } from "@/components/icons";
 import { SiteHeader } from "@/components/site-header";
 
-export async function ShopLanding() {
+export async function ShopLanding({ resumeHref }: { resumeHref?: string }) {
   const slug = SHOP_SLUG;
   const org = await getOrgBySlug(slug);
   const address = org?.address || SHOP_DETAILS.address;
@@ -62,6 +62,12 @@ export async function ShopLanding() {
     <>
       <SiteHeader next={`/${slug}`} />
       <main>
+        {resumeHref && (
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+            <p className="text-sm font-semibold">Você pode continuar de onde parou.</p>
+            <Link href={resumeHref} className={buttonClass({ variant: "outline", size: "sm" })}>Continuar</Link>
+          </div>
+        )}
         <section className="border-b border-line bg-night text-white">
           <div className="pole-stripes h-1.5" />
           <div className="mx-auto grid max-w-6xl items-center gap-8 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr] md:py-16">

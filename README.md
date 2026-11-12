@@ -13,6 +13,10 @@ Acesse http://localhost:3000. Sem `DATABASE_URL`, o projeto usa PGlite e prepara
 
 No painel administrativo, use **Equipe → Perfil e fotos** ou **Equipe → Expediente** para gerenciar um profissional. As pausas de almoço são opcionais e configuradas separadamente para cada dia da semana. Fotos do portfólio precisam de um nome de corte para aparecerem no perfil público.
 
+## Aplicativo mobile
+
+O projeto Expo para Android e iPhone fica em [mobile](mobile/README.md) e usa a agenda publicada.
+
 ## Produção
 
 A Vercel executa as migrações no Postgres antes do build. Para uploads, conecte ao projeto um Vercel Blob público e configure `BLOB_READ_WRITE_TOKEN`. A produção não recebe contas ou reservas de demonstração.

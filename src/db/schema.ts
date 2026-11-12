@@ -195,6 +195,23 @@ export const services = pgTable(
 
 // Reservas de clientes e bloqueios do barbeiro vivem na mesma tabela:
 // a constraint de exclusão (migração 0001) impede qualquer sobreposição.
+export const weeklyBookings = pgTable("weekly_bookings", {
+  id: id(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  barberId: uuid("barber_id").notNull().references(() => barbers.id, { onDelete: "cascade" }),
+  serviceId: uuid("service_id").references(() => services.id, { onDelete: "set null" }),
+  serviceName: text("service_name").notNull(),
+  durationMin: integer("duration_min").notNull(),
+  guestName: text("guest_name").notNull(),
+  guestPhone: text("guest_phone").notNull(),
+  firstDate: text("first_date").notNull(),
+  startMinute: smallint("start_minute").notNull(),
+  timezone: text("timezone").notNull(),
+  conflictDate: text("conflict_date"),
+  endedAt: timestamp("ended_at", { withTimezone: true }),
+  createdAt: createdAt(),
+});
+
 export const appointments = pgTable(
   "appointments",
   {
@@ -212,6 +229,7 @@ export const appointments = pgTable(
     }),
     guestName: text("guest_name"),
     guestPhone: text("guest_phone"),
+    weeklyBookingId: uuid("weekly_booking_id").references(() => weeklyBookings.id, { onDelete: "set null" }),
     whatsappPhone: text("whatsapp_phone"),
     whatsappConfirmedAt: timestamp("whatsapp_confirmed_at", { withTimezone: true }),
     whatsappRemindedAt: timestamp("whatsapp_reminded_at", { withTimezone: true }),
@@ -230,6 +248,7 @@ export const appointments = pgTable(
   (t) => [
     index("appointments_barber_time_idx").on(t.barberId, t.startsAt),
     index("appointments_client_idx").on(t.clientId, t.startsAt),
+    uniqueIndex("appointments_weekly_start_uq").on(t.weeklyBookingId, t.startsAt),
     check("appointments_range_ck", sql`${t.startsAt} < ${t.endsAt}`),
   ],
 );

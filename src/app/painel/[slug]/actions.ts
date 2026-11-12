@@ -11,8 +11,9 @@ import { requireMember } from "@/lib/tenant";
 import { agendaRules, loadAgenda } from "@/lib/agenda";
 import { bookableStarts } from "@/lib/slots";
 import { whatsAppSchema } from "@/lib/phone";
-import { isISODate, localDateISO, zonedToMs } from "@/lib/time";
+import { fmtDateLong, isISODate, localDateISO, localMinutes, zonedToMs } from "@/lib/time";
 import { firstError, formObject, pgErrorCode, type FormState } from "@/lib/forms";
+import { createWeeklyBooking, endWeeklyBooking } from "@/lib/weekly-bookings";
 
 /** Dono gerencia qualquer barbeiro da barbearia; barbeiro só a própria agenda. */
 async function assertCanManage(slug: string, barberId: string) {
@@ -94,12 +95,13 @@ const manualBookingSchema = z.object({
   guestName: z.string().trim().min(2, "Informe o nome do cliente.").max(80),
   guestPhone: whatsAppSchema,
   whatsappOptIn: z.literal("on").optional(),
+  weekly: z.literal("on").optional(),
 });
 
 export async function addManualBooking(_: FormState, fd: FormData): Promise<FormState> {
   const parsed = manualBookingSchema.safeParse(formObject(fd));
   if (!parsed.success) return { error: firstError(parsed.error) };
-  const { slug, barberId, serviceId, date, start, guestName, guestPhone, whatsappOptIn } = parsed.data;
+  const { slug, barberId, serviceId, date, start, guestName, guestPhone, whatsappOptIn, weekly } = parsed.data;
   const { org } = await requireMember(slug, ["owner"]);
 
   const [[barber], [service]] = await Promise.all([
@@ -122,6 +124,19 @@ export async function addManualBooking(_: FormState, fd: FormData): Promise<Form
   }
 
   try {
+    if (weekly) {
+      const result = await createWeeklyBooking(org, {
+        barberId, serviceId, serviceName: service.name, durationMin: service.durationMin,
+        guestName, guestPhone, firstDate: date, startMinute: localMinutes(start, org.timezone),
+      });
+      if (result.conflicts.length) {
+        const dates = result.conflicts.map((day) => fmtDateLong(zonedToMs(day, 720, org.timezone), org.timezone));
+        return { error: `O horário fixo tem conflitos em ${dates.slice(0, 3).join("; ")}${dates.length > 3 ? " e outras datas" : ""}. Escolha outro horário.` };
+      }
+      if (!result.count) return { error: "Escolha uma data futura para iniciar o horário fixo." };
+      refreshAgenda(slug);
+      return { ok: `Horário fixo criado. ${result.count} reservas semanais garantidas na agenda.` };
+    }
     const [appointment] = await db.insert(appointments).values({
       orgId: org.id,
       barberId,
@@ -149,4 +164,13 @@ export async function addManualBooking(_: FormState, fd: FormData): Promise<Form
 
   refreshAgenda(slug);
   return { ok: "Agendamento registrado." };
+}
+
+export async function cancelWeeklyBooking(fd: FormData) {
+  const slug = String(fd.get("slug"));
+  const { org } = await requireMember(slug, ["owner"]);
+  const id = z.uuid().safeParse(fd.get("id"));
+  if (!id.success) return;
+  await endWeeklyBooking(org.id, id.data);
+  refreshAgenda(slug);
 }

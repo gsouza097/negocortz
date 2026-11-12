@@ -63,6 +63,8 @@ Configure `CRON_SECRET` na Vercel para habilitar o endpoint de notificações. A
 
 ## Variáveis de ambiente
 
+O job diário em `/api/whatsapp/lembretes` também renova os horários fixos semanais ativos, mesmo sem credenciais do WhatsApp. Para habilitar a renovação em produção, configure `CRON_SECRET` no projeto da Vercel e faça o deploy. O painel mostra conflitos nas próximas ocorrências. Cancelar uma ocorrência mantém a série ativa, enquanto encerrar a série libera as próximas datas.
+
 | Variável | Criada por | Uso |
 | --- | --- | --- |
 | `DATABASE_URL` | Integração Neon | Conexão do app (pooler). Obrigatória. |

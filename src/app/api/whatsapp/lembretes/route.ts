@@ -1,5 +1,6 @@
 import { equalSecret } from "@/lib/whatsapp/meta";
 import { sendDueAppointmentMessages } from "@/lib/whatsapp/notifications";
+import { extendWeeklyBookings } from "@/lib/weekly-bookings";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -10,5 +11,6 @@ export async function GET(request: Request) {
   if (!equalSecret(request.headers.get("authorization") ?? "", `Bearer ${secret}`)) {
     return new Response(null, { status: 401 });
   }
-  return Response.json(await sendDueAppointmentMessages());
+  const weekly = await extendWeeklyBookings();
+  return Response.json({ ...await sendDueAppointmentMessages(), weekly });
 }

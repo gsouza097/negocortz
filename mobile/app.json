@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Nego Cortz",
+    "slug": "negocortz",
+    "scheme": "negocortz",
+    "version": "1.0.0",
+    "platforms": [
+      "android",
+      "ios"
+    ],
+    "orientation": "portrait",
+    "icon": "./assets/icon-nego-cortz.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "com.negocortz.app",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Selecione fotos para o perfil ou portfólio da barbearia.",
+        "NSCameraUsageDescription": "Tire uma foto para o perfil ou portfólio da barbearia."
+      }
+    },
+    "android": {
+      "package": "com.negocortz.app"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#101116",
+          "image": "./assets/icon-nego-cortz.png",
+          "imageWidth": 160
+        }
+      ],
+      "expo-image"
+    ]
+  }
+}

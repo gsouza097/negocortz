@@ -21,6 +21,12 @@ export function safeNext(next: string | null | undefined, fallback = "/") {
   return next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") && !Array.from(next).some((char) => char.charCodeAt(0) < 32 || char === "\x7f") ? next : fallback;
 }
 
+export function loginHome(next: string | undefined) {
+  const destination = safeNext(next);
+  if (destination === "/" || destination === "/inicio" || destination.startsWith("/?login=")) return "/?login=1";
+  return `/?login=1&continuar=${encodeURIComponent(destination)}`;
+}
+
 /** Normaliza @handle, URL do Instagram ou handle puro para só o handle. */
 export function instagramHandle(input: string | undefined | null) {
   if (!input) return null;
