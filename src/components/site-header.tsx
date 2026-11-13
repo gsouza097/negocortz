@@ -15,6 +15,9 @@ export async function SiteHeader({ next }: { next?: string }) {
         </Link>
         {user ? (
           <nav className="flex flex-wrap justify-end gap-1 text-sm">
+            <Link href="/notificacoes" className={buttonClass({ variant: "ghost", size: "sm" })}>
+              Notificações
+            </Link>
             <Link href="/minhas-reservas" className={buttonClass({ variant: "ghost", size: "sm" })}>
               Minhas reservas
             </Link>

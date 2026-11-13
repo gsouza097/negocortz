@@ -12,6 +12,7 @@ export default async function PanelLayout({ children, params }: LayoutProps<"/pa
   const base = `/painel/${slug}`;
   const items = [
     { href: base, label: "Agenda" },
+    { href: "/notificacoes", label: "Notificações" },
     ...(barber
       ? [
           { href: `${base}/perfil`, label: "Meu perfil" },
