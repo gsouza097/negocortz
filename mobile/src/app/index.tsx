@@ -38,11 +38,6 @@ export default function HomeScreen() {
               <Text style={styles.buttonText}>Minhas reservas</Text>
             </Pressable>
           </Link>
-          <Link href={{ pathname: "/portal", params: { destino: "painel" } }} asChild>
-            <Pressable style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
-              <Text style={styles.buttonText}>Painel da equipe</Text>
-            </Pressable>
-          </Link>
           <Pressable
             accessibilityRole="button"
             style={({ pressed }) => [styles.share, pressed && styles.pressed]}

@@ -47,7 +47,7 @@ export default async function TeamPage({ params }: PageProps<"/painel/[slug]/equ
       <ul className="mt-6 divide-y divide-line rounded-3xl border border-line bg-white">
         {team.length === 0 && <li className="p-6 text-center text-sm text-ink-2">Nenhum barbeiro ainda.</li>}
         {team.map(({ barber: b, email }) => (
-          <li key={b.id} className={cx("flex flex-wrap items-center gap-4 p-4", !b.active && "opacity-60")}>
+          <li key={b.id} className={cx("grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-3 p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto]", !b.active && "opacity-60")}>
             <Avatar name={b.displayName} src={b.avatarUrl} size={44} />
             <div className="min-w-0 flex-1">
               <p className="font-semibold">
@@ -60,6 +60,7 @@ export default async function TeamPage({ params }: PageProps<"/painel/[slug]/equ
                 · {email}
               </p>
             </div>
+            <div className="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-1">
             <Link href={`/painel/${slug}/perfil?barbeiro=${b.id}`} className={buttonClass({ variant: "outline", size: "sm" })}>Perfil e fotos</Link>
             <Link href={`/painel/${slug}/horarios?barbeiro=${b.id}`} className={buttonClass({ variant: "outline", size: "sm" })}>Expediente</Link>
             <form action={toggleBarber}>
@@ -70,6 +71,7 @@ export default async function TeamPage({ params }: PageProps<"/painel/[slug]/equ
                 {b.active ? "Pausar" : "Reativar"}
               </button>
             </form>
+            </div>
           </li>
         ))}
       </ul>

@@ -15,7 +15,7 @@ export default async function ServicesPage({ params }: PageProps<"/painel/[slug]
   return (
     <div className="mx-auto max-w-3xl">
       <p className="font-mono text-xs uppercase tracking-[0.2em] text-ink-2">Serviços</p>
-      <h1 className="font-display text-5xl leading-none sm:text-6xl">Cardápio</h1>
+      <h1 className="font-display text-5xl leading-none sm:text-6xl">Serviços</h1>
       <p className="mt-2 mb-8 text-ink-2">A duração define quanto da agenda cada reserva ocupa. Serviço oculto não aparece para novos clientes.</p>
 
       <section className="rounded-3xl bg-night p-5 text-paper sm:p-6 [&_input]:text-ink [&_select]:text-ink">

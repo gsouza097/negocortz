@@ -55,10 +55,14 @@ export function phoneSetupPath(next: string) {
 
 export const needsCustomerPhone = cache(async (userId: string, phone: string | null) => {
   if (normalizeWhatsApp(phone)) return false;
+  return !(await isTeamMember(userId));
+});
+
+export const isTeamMember = cache(async (userId: string) => {
   const [teamMember] = await db.select({ id: memberships.userId }).from(memberships)
     .innerJoin(organizations, eq(organizations.id, memberships.orgId))
     .where(and(eq(memberships.userId, userId), eq(organizations.slug, SHOP_SLUG))).limit(1);
-  return !teamMember;
+  return Boolean(teamMember);
 });
 
 export async function requireUser(next?: string) {

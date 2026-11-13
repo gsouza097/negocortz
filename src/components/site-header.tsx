@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { getUser } from "@/lib/auth/session";
+import { getUser, isTeamMember } from "@/lib/auth/session";
 import { signOut } from "@/app/(auth)/actions";
 import { Logo } from "./logo";
 import { buttonClass } from "./styles";
 
 export async function SiteHeader({ next }: { next?: string }) {
   const user = await getUser();
+  const showPanel = user && await isTeamMember(user.id);
   const qs = next ? `?next=${encodeURIComponent(next)}` : "";
   return (
     <header className="sticky top-0 z-30 border-b border-line/70 bg-paper/90 backdrop-blur">
@@ -21,9 +22,11 @@ export async function SiteHeader({ next }: { next?: string }) {
             <Link href="/minhas-reservas" className={buttonClass({ variant: "ghost", size: "sm" })}>
               Minhas reservas
             </Link>
-            <Link href="/painel" className={buttonClass({ variant: "ghost", size: "sm" })}>
-              Painel
-            </Link>
+            {showPanel && (
+              <Link href="/painel" className={buttonClass({ variant: "ghost", size: "sm" })}>
+                Painel
+              </Link>
+            )}
             <form action={signOut}>
               <button className={buttonClass({ variant: "outline", size: "sm" })}>Sair</button>
             </form>
